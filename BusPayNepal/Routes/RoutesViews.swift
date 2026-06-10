@@ -3,14 +3,33 @@ import SwiftUI
 
 struct RoutesView: View {
     @EnvironmentObject private var routesVM: RoutesViewModel
+    @State private var filter = "Nearby"
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                TextField("Search route, number, or stop", text: $routesVM.searchText)
-                    .padding()
-                    .background(.background, in: RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(.separator.opacity(0.4)))
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "line.3.horizontal")
+                    Text("Bus Pay Nepal")
+                        .font(AppFont.sectionHeading)
+                        .foregroundStyle(AppColors.brandGold)
+                    Spacer()
+                }
+
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(AppColors.labelGrey)
+                    TextField("Search routes, stops, or numbers...", text: $routesVM.searchText)
+                        .font(AppFont.bodyPrimary)
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 48)
+                .background(Color(hex: "F1F3F5"), in: RoundedRectangle(cornerRadius: 12))
+
+                HStack(spacing: 10) {
+                    filterPill("Nearby")
+                    filterPill("All")
+                }
 
                 ForEach(routesVM.filteredRoutes) { route in
                     NavigationLink {
@@ -25,8 +44,20 @@ struct RoutesView: View {
             .padding(.bottom, 96)
         }
         .task { await routesVM.load() }
-        .navigationTitle("Routes")
-        .background(SmartFareColor.appBackground.ignoresSafeArea())
+        .background(AppColors.pageBackground.ignoresSafeArea())
+    }
+
+    private func filterPill(_ title: String) -> some View {
+        Button { filter = title } label: {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(filter == title ? AppColors.nearBlack : AppColors.labelGrey)
+                .padding(.horizontal, 16)
+                .frame(height: 36)
+                .background(filter == title ? AppColors.amberCTA : Color.clear, in: Capsule())
+                .overlay(Capsule().stroke(filter == title ? Color.clear : AppColors.inputBorder, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -38,14 +69,14 @@ struct RouteDetailsView: View {
     ))
 
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 18) {
                 Map(position: $camera) {
                     Marker(route.origin, coordinate: CLLocationCoordinate2D(latitude: 27.708, longitude: 85.315))
                     Marker(route.destination, coordinate: CLLocationCoordinate2D(latitude: 27.721, longitude: 85.361))
                 }
                 .frame(height: 220)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
 
                 RouteCard(route: route)
 
@@ -56,26 +87,23 @@ struct RouteDetailsView: View {
                             Text("\(index + 1)")
                                 .font(.caption.weight(.bold))
                                 .frame(width: 28, height: 28)
-                                .background(SmartFareColor.primaryBlue.opacity(0.12), in: Circle())
+                                .background(AppColors.amberCTA.opacity(0.2), in: Circle())
                             Text(stop)
                             Spacer()
                         }
                     }
                 }
                 .smartCard()
-
-                VStack(alignment: .leading, spacing: 10) {
-                    SectionHeader(title: "Live Bus Locations")
-                    Label("3 buses moving near \(route.origin)", systemImage: "location.fill")
-                    Label("Estimated travel time: \(route.estimatedDuration)", systemImage: "clock.fill")
-                    Label("Fare: \(SmartFareFormatter.rupees(route.fare))", systemImage: "creditcard.fill")
-                }
-                .smartCard()
             }
             .padding(20)
         }
         .navigationTitle(route.number)
-        .background(SmartFareColor.appBackground.ignoresSafeArea())
+        .background(AppColors.pageBackground.ignoresSafeArea())
     }
 }
 
+#if DEBUG
+#Preview("Routes") {
+    NavigationStack { RoutesView().environmentObject(RoutesViewModel(routeService: MockRouteService())) }
+}
+#endif

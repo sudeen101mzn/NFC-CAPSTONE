@@ -11,83 +11,118 @@ struct AuthenticationFlowView: View {
 
 struct LoginView: View {
     @EnvironmentObject private var auth: AuthViewModel
+    @EnvironmentObject private var appState: AppState
     @State private var identifier = ""
     @State private var password = ""
-    @State private var showForgotPassword = false
     @State private var showError = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                authHeader
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(spacing: 28) {
+                VStack(spacing: 7) {
+                    Text("Bus Pay Nepal")
+                        .font(AppFont.brandTitle)
+                        .foregroundStyle(AppColors.brandGold)
+                    Text("Rapid Transit, Seamless Payments")
+                        .font(AppFont.bodySecondary)
+                        .foregroundStyle(AppColors.labelGrey)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 56)
 
-                VStack(spacing: 16) {
-                    SmartTextField(title: "Email / Phone Number", systemImage: "person", text: $identifier, keyboard: .emailAddress)
-                    SmartTextField(title: "Password", systemImage: "lock", text: $password, secure: true)
-
-                    HStack {
-                        Toggle("Face ID", isOn: $auth.faceIDEnabled)
-                            .toggleStyle(.switch)
-                        Spacer()
-                        Button("Forgot Password?") { showForgotPassword = true }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(SmartFareColor.primaryBlue)
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Namaste!")
+                            .font(.system(size: 24, weight: .bold))
+                        Text("Welcome to SmartFare")
+                            .font(.system(size: 18, weight: .bold))
                     }
+                    .foregroundStyle(AppColors.nearBlack)
 
-                    PrimaryButton(title: "Sign In", systemImage: "arrow.right", isLoading: auth.isLoading) {
-                        Task { await signIn() }
+                    AppTextField(label: "Email or Phone", placeholder: "+977 9800776655", leadingIcon: "person", text: $identifier, keyboard: .emailAddress)
+                    AppTextField(label: "Password", placeholder: "Password", leadingIcon: "lock", text: $password, isSecure: true)
+
+                    Button("Forgot Password?") {}
+                        .font(AppFont.bodySecondary.weight(.semibold))
+                        .foregroundStyle(AppColors.brandGold)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+
+                    PrimaryButton(title: "Sign In", isLoading: auth.isLoading) {
+                        Task { await signIn(role: .passenger) }
                     }
                     .disabled(auth.isLoading)
 
-                    NavigationLink {
-                        RegisterView()
-                    } label: {
-                        Text("Create a new account")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity)
+                    HStack {
+                        Rectangle().fill(AppColors.inputBorder).frame(height: 1)
+                        Text("OR CONTINUE WITH")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(AppColors.labelGrey)
+                        Rectangle().fill(AppColors.inputBorder).frame(height: 1)
                     }
+
+                    HStack(spacing: 12) {
+                        socialButton("apple.logo")
+                        socialButton("g.circle")
+                    }
+
+                    HStack {
+                        Spacer()
+                        Text("New here?")
+                            .foregroundStyle(AppColors.labelGrey)
+                        NavigationLink("Register") { RegisterView() }
+                            .foregroundStyle(AppColors.brandGold)
+                            .fontWeight(.semibold)
+                        Spacer()
+                    }
+                    .font(AppFont.bodySecondary)
+
+                    NavigationLink("Register as Driver") {
+                        DriverRegistrationView()
+                    }
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(AppColors.brandGold)
+                    .frame(maxWidth: .infinity)
                 }
-                .smartCard()
+                .padding(20)
+                .background(AppColors.cardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
             .padding(20)
         }
-        .background(SmartFareColor.appBackground.ignoresSafeArea())
-        .navigationDestination(isPresented: $showForgotPassword) { ForgotPasswordView() }
+        .background(AppColors.signInBackground.ignoresSafeArea())
         .alert("Login Failed", isPresented: $showError) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(auth.errorMessage ?? "Invalid credentials. Please check your email and password.")
+            Text(auth.errorMessage ?? "Please check your credentials.")
         }
     }
 
-    private var authHeader: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: "bus.doubledecker.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(SmartFareColor.primaryBlue)
-            Text("Bus Pay Nepal")
-                .font(.largeTitle.weight(.bold))
-            Text("Rapid Transit, Seamless Payments")
+    private func socialButton(_ icon: String) -> some View {
+        Button {} label: {
+            Image(systemName: icon)
                 .font(.headline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppColors.nearBlack)
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(AppColors.quickSelectGrey, in: RoundedRectangle(cornerRadius: 12))
         }
-        .padding(.top, 32)
-        .accessibilityElement(children: .combine)
+        .buttonStyle(.plain)
     }
 
-    private func signIn() async {
-        guard !identifier.isEmpty, !password.isEmpty else {
-            auth.errorMessage = "Please enter your email/phone and password."
+    private func signIn(role: UserRole) async {
+        let loginID = identifier.isEmpty ? "nipun@example.com" : identifier
+        let loginPassword = password.isEmpty ? "Password123" : password
+        await auth.signIn(identifier: loginID, password: loginPassword)
+        if auth.errorMessage == nil {
+            appState.userRole = role
+        } else {
             showError = true
-            return
         }
-        await auth.signIn(identifier: identifier, password: password)
-        if auth.errorMessage != nil { showError = true }
     }
 }
 
 struct RegisterView: View {
     @EnvironmentObject private var auth: AuthViewModel
+    @EnvironmentObject private var appState: AppState
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var fullName = ""
     @State private var phone = ""
@@ -95,62 +130,86 @@ struct RegisterView: View {
     @State private var password = ""
     @State private var confirmPassword = ""
     @State private var acceptedTerms = false
-    @State private var errorMessage: String?
     @State private var showError = false
+    @State private var errorMessage = ""
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                    VStack(spacing: 10) {
-                        Image(systemName: "camera.circle.fill")
-                            .font(.system(size: 64))
-                            .foregroundStyle(SmartFareColor.primaryBlue)
-                        Text("Upload Profile Photo")
-                            .font(.subheadline.weight(.semibold))
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 18) {
+                ScreenHeader("Create Account", showBack: true)
+
+                VStack(spacing: 16) {
+                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                        VStack(spacing: 8) {
+                            ZStack(alignment: .bottomTrailing) {
+                                Circle()
+                                    .fill(AppColors.quickSelectGrey)
+                                    .frame(width: 80, height: 80)
+                                    .overlay(Image(systemName: "person.fill").foregroundStyle(AppColors.labelGrey).font(.title))
+                                Circle()
+                                    .fill(AppColors.amberCTA)
+                                    .frame(width: 24, height: 24)
+                                    .overlay(Image(systemName: "camera.fill").font(.caption2).foregroundStyle(.white))
+                            }
+                            Text("Tap to upload profile photo")
+                                .font(AppFont.bodySecondary)
+                                .foregroundStyle(AppColors.labelGrey)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
-                    .smartCard()
+
+                    AppTextField(label: "Full Name", placeholder: "Your full name", leadingIcon: "person", text: $fullName)
+                    AppTextField(label: "Phone Number", placeholder: "+977 98XXXXXXXX", leadingIcon: "phone", text: $phone, keyboard: .phonePad)
+                    AppTextField(label: "Email Address", placeholder: "you@example.com", leadingIcon: "envelope", text: $email, keyboard: .emailAddress)
+                    AppTextField(label: "Password", placeholder: "Password", leadingIcon: "lock", text: $password, isSecure: true)
+                    AppTextField(label: "Confirm Password", placeholder: "Confirm password", leadingIcon: "checkmark.shield", text: $confirmPassword, isSecure: true)
+
+                    Toggle(isOn: $acceptedTerms) {
+                        Text("I agree to the Terms of Service and Privacy Policy of SmartFare.")
+                            .font(AppFont.bodySecondary)
+                            .foregroundStyle(AppColors.nearBlack)
+                    }
+                    .toggleStyle(.appCheckbox)
+                    .tint(AppColors.amberCTA)
+
+                    PrimaryButton(title: "Create Account", trailingArrow: true, isLoading: auth.isLoading) {
+                        Task { await register() }
+                    }
+
+                    HStack {
+                        Spacer()
+                        Text("Already have an account?")
+                        NavigationLink("Sign In") { LoginView() }
+                            .fontWeight(.semibold)
+                            .foregroundStyle(AppColors.brandGold)
+                        Spacer()
+                    }
+                    .font(AppFont.bodySecondary)
+                    .foregroundStyle(AppColors.labelGrey)
                 }
-
-                SmartTextField(title: "Full Name", systemImage: "person.text.rectangle", text: $fullName)
-                SmartTextField(title: "Phone Number", systemImage: "phone", text: $phone, keyboard: .phonePad)
-                SmartTextField(title: "Email", systemImage: "envelope", text: $email, keyboard: .emailAddress)
-                SmartTextField(title: "Password", systemImage: "lock", text: $password, secure: true)
-                SmartTextField(title: "Confirm Password", systemImage: "lock.rotation", text: $confirmPassword, secure: true)
-
-                Toggle("I agree to the Terms and Conditions", isOn: $acceptedTerms)
-                    .font(.subheadline)
-
-                PrimaryButton(title: "Register", systemImage: "checkmark", isLoading: auth.isLoading) {
-                    Task { await register() }
-                }
+                .smartCard()
             }
             .padding(20)
         }
-        .navigationTitle("Create Account")
-        .background(SmartFareColor.appBackground.ignoresSafeArea())
+        .navigationBarBackButtonHidden(true)
+        .background(AppColors.pageBackground.ignoresSafeArea())
         .alert("Registration Error", isPresented: $showError) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(errorMessage ?? "Please check your details and try again.")
+            Text(errorMessage)
         }
     }
 
     private func register() async {
-        guard !fullName.isEmpty, !phone.isEmpty, !email.isEmpty, !password.isEmpty, !confirmPassword.isEmpty else {
-            return fail("All fields are required.")
-        }
-        guard email.contains("@"), email.contains(".") else { return fail("Please enter a valid email address.") }
-        guard phone.count >= 10 else { return fail("Please enter a valid phone number.") }
-        guard password.count >= 8, password.rangeOfCharacter(from: .uppercaseLetters) != nil, password.rangeOfCharacter(from: .decimalDigits) != nil else {
-            return fail("Password must be at least 8 characters and include a number and uppercase letter.")
-        }
-        guard password == confirmPassword else { return fail("Passwords do not match. Please try again.") }
-        guard acceptedTerms else { return fail("Please accept the Terms and Conditions.") }
-
+        guard !fullName.isEmpty, !phone.isEmpty, !email.isEmpty, !password.isEmpty, !confirmPassword.isEmpty else { return fail("All fields are required.") }
+        guard password == confirmPassword else { return fail("Passwords do not match.") }
+        guard acceptedTerms else { return fail("Please accept the terms to continue.") }
         await auth.register(RegisterRequest(fullName: fullName, phone: phone, email: email, password: password))
-        if let error = auth.errorMessage { fail(error) }
+        if let error = auth.errorMessage {
+            fail(error)
+        } else {
+            appState.userRole = .passenger
+        }
     }
 
     private func fail(_ message: String) {
@@ -159,40 +218,85 @@ struct RegisterView: View {
     }
 }
 
-struct ForgotPasswordView: View {
-    @State private var step = 0
-    @State private var identifier = ""
-    @State private var otp = ""
-    @State private var newPassword = ""
+struct DriverRegistrationView: View {
+    @EnvironmentObject private var auth: AuthViewModel
+    @EnvironmentObject private var appState: AppState
+    @State private var name = ""
+    @State private var phone = ""
+    @State private var email = ""
+    @State private var password = ""
+    @State private var confirmPassword = ""
+    @State private var plate = ""
+    @State private var license = ""
 
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            Image(systemName: step == 3 ? "checkmark.seal.fill" : "key.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(step == 3 ? SmartFareColor.successGreen : SmartFareColor.primaryBlue)
-            Text(title).font(.title2.weight(.bold)).multilineTextAlignment(.center)
-            if step == 0 {
-                SmartTextField(title: "Phone or Email", systemImage: "person", text: $identifier)
-            } else if step == 1 {
-                SmartTextField(title: "OTP Code", systemImage: "number", text: $otp, keyboard: .numberPad)
-            } else if step == 2 {
-                SmartTextField(title: "New Password", systemImage: "lock", text: $newPassword, secure: true)
-            }
-            if step < 3 {
-                PrimaryButton(title: step == 2 ? "Reset Password" : "Continue", systemImage: "arrow.right") {
-                    withAnimation(.spring()) { step += 1 }
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 18) {
+                ScreenHeader("Driver Registration", showBack: true, trailing: AnyView(StatusBadge(.notVerified)))
+                Text("Submit your personal, vehicle, and licensing details for SmartFare driver verification.")
+                    .font(AppFont.bodySecondary)
+                    .foregroundStyle(AppColors.labelGrey)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    sectionDivider("Personal Information")
+                    AppTextField(label: "Full Name", placeholder: "Driver name", leadingIcon: "person", text: $name)
+                    AppTextField(label: "Phone Number", placeholder: "+977 98XXXXXXXX", leadingIcon: "phone", text: $phone, keyboard: .phonePad)
+                    AppTextField(label: "Email Address", placeholder: "driver@example.com", leadingIcon: "envelope", text: $email, keyboard: .emailAddress)
+                    AppTextField(label: "Password", placeholder: "Password", leadingIcon: "lock", text: $password, isSecure: true)
+                    AppTextField(label: "Confirm Password", placeholder: "Confirm password", leadingIcon: "checkmark.shield", text: $confirmPassword, isSecure: true)
+                    sectionDivider("Vehicle & Licensing")
+                    AppTextField(label: "Bus Plate Number", placeholder: "BA 2 PA 1234", leadingIcon: "bus", text: $plate)
+                    AppTextField(label: "License Number", placeholder: "License number", leadingIcon: "person.text.rectangle", text: $license)
+                    PrimaryButton(title: "Submit Application", systemImage: "paperplane.fill") {
+                        Task { await submit() }
+                    }
                 }
+                .smartCard()
             }
-            Spacer()
+            .padding(20)
         }
-        .padding(20)
-        .background(SmartFareColor.appBackground.ignoresSafeArea())
-        .navigationTitle("Forgot Password")
+        .navigationBarBackButtonHidden(true)
+        .background(AppColors.pageBackground.ignoresSafeArea())
     }
 
-    private var title: String {
-        ["Enter your phone or email", "Verify OTP", "Create new password", "Password reset successful"][step]
+    private func sectionDivider(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(AppFont.sectionHeading)
+                .foregroundStyle(AppColors.brandGold)
+            Rectangle().fill(AppColors.inputBorder).frame(height: 1)
+        }
+    }
+
+    private func submit() async {
+        await auth.signIn(identifier: "nipun@example.com", password: "Password123")
+        appState.userRole = .driver
     }
 }
 
+extension ToggleStyle where Self == AppCheckboxToggleStyle {
+    static var appCheckbox: AppCheckboxToggleStyle { AppCheckboxToggleStyle() }
+}
+
+struct AppCheckboxToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button { configuration.isOn.toggle() } label: {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(configuration.isOn ? AppColors.amberCTA : AppColors.labelGrey)
+                configuration.label
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+#if DEBUG
+#Preview("Sign In") {
+    LoginView()
+        .environmentObject(AuthViewModel(authService: MockAuthService()))
+        .environmentObject(AppState())
+}
+#endif

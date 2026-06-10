@@ -1,6 +1,8 @@
 import Foundation
+#if canImport(CoreNFC) && canImport(UIKit)
 import CoreNFC
 import UIKit
+#endif
 
 protocol NFCServicing {
     func scanAndProcess(currentBalance: Decimal) async throws -> NFCPaymentResult
@@ -23,6 +25,7 @@ enum NFCServiceError: LocalizedError {
     }
 }
 
+#if canImport(CoreNFC) && canImport(UIKit)
 final class CoreNFCService: NSObject, NFCServicing, NFCNDEFReaderSessionDelegate {
     private var continuation: CheckedContinuation<NFCPaymentResult, Error>?
     private var currentBalance: Decimal = 0
@@ -87,4 +90,20 @@ final class CoreNFCService: NSObject, NFCServicing, NFCNDEFReaderSessionDelegate
         continuation = nil
     }
 }
-
+#else
+final class CoreNFCService: NFCServicing {
+    func scanAndProcess(currentBalance: Decimal) async throws -> NFCPaymentResult {
+        try await Task.sleep(nanoseconds: 1_200_000_000)
+        let fare: Decimal = 25
+        guard currentBalance >= fare else { throw NFCServiceError.insufficientBalance }
+        return NFCPaymentResult(
+            route: "Green Line",
+            terminalID: "TERM-BP-PREVIEW",
+            fare: fare,
+            previousBalance: currentBalance,
+            newBalance: currentBalance - fare,
+            scannedAt: .now
+        )
+    }
+}
+#endif

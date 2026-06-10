@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var auth: AuthViewModel
+    @EnvironmentObject private var appState: AppState
 
     var body: some View {
         Group {
@@ -12,6 +13,9 @@ struct RootView: View {
                 AuthenticationFlowView()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+        }
+        .onChange(of: auth.isAuthenticated) { _, authenticated in
+            if !authenticated { appState.userRole = .unauthenticated }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.86), value: auth.isAuthenticated)
     }
@@ -26,7 +30,11 @@ struct MainTabShell: View {
                 Group {
                     switch appState.selectedTab {
                     case .home:
-                        HomeDashboardView()
+                        if appState.userRole == .driver {
+                            DriverDashboardView()
+                        } else {
+                            HomeDashboardView()
+                        }
                     case .history:
                         TransactionHistoryView()
                     case .nfc:
@@ -37,70 +45,93 @@ struct MainTabShell: View {
                         SettingsView()
                     }
                 }
-                .navigationBarTitleDisplayMode(.inline)
             }
 
-            SmartTabBar(selection: $appState.selectedTab)
+            if appState.selectedTab == .routes {
+                BottomNavBar4(selection: $appState.selectedTab)
+            } else {
+                BottomNavBar(selection: $appState.selectedTab)
+            }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 }
 
-struct SmartTabBar: View {
-    @Binding var selection: MainTab
+struct SettingsView: View {
+    @EnvironmentObject private var auth: AuthViewModel
+    @EnvironmentObject private var appState: AppState
+    @AppStorage("appearance.darkMode") private var darkMode = false
 
     var body: some View {
-        HStack {
-            tab(.home, "house.fill", "Home")
-            tab(.history, "clock.arrow.circlepath", "History")
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Menu")
+                    .font(AppFont.pageTitle)
+                    .foregroundStyle(AppColors.nearBlack)
 
-            Button {
-                selection = .nfc
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            } label: {
-                VStack(spacing: 5) {
-                    Image(systemName: "wave.3.right.circle.fill")
-                        .font(.system(size: 32, weight: .bold))
-                    Text("Tap")
-                        .font(.caption2.weight(.bold))
+                VStack(spacing: 8) {
+                    Text("Logged In As")
+                        .font(AppFont.bodySecondary)
+                        .foregroundStyle(AppColors.labelGrey)
+                    Text(appState.userRole == .driver ? "Driver" : "Passenger")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(AppColors.successGreen)
                 }
-                .foregroundStyle(.white)
-                .frame(width: 72, height: 72)
-                .background(
-                    LinearGradient(colors: [SmartFareColor.primaryBlue, SmartFareColor.secondaryTeal], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    in: Circle()
-                )
-                .shadow(color: SmartFareColor.primaryBlue.opacity(0.32), radius: 16, y: 8)
-                .offset(y: -24)
-                .accessibilityLabel("NFC Tap")
-            }
-            .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(AppColors.quickSelectGrey, in: RoundedRectangle(cornerRadius: 12))
 
-            tab(.routes, "map.fill", "Routes")
-            tab(.settings, "gearshape.fill", "Settings")
+                menuToggle("Dark Mode", icon: "moon.fill", isOn: $darkMode)
+                menuRow("Settings", icon: "gearshape")
+                menuRow("Fare List", icon: "bag")
+                menuRow("About", icon: "info.circle")
+                menuRow("Privacy Policy", icon: "lock")
+                Button { auth.logout() } label: {
+                    menuContent("Logout", icon: "rectangle.portrait.and.arrow.right", trailing: AnyView(EmptyView()))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(20)
+            .padding(.bottom, 96)
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+        .background(AppColors.cardSurface.ignoresSafeArea())
     }
 
-    private func tab(_ tab: MainTab, _ icon: String, _ label: String) -> some View {
-        Button {
-            selection = tab
-        } label: {
-            VStack(spacing: 5) {
-                Image(systemName: icon).font(.system(size: 18, weight: .semibold))
-                Text(label).font(.caption2.weight(.medium))
-            }
-            .frame(maxWidth: .infinity)
-            .foregroundStyle(selection == tab ? SmartFareColor.primaryBlue : .secondary)
-            .frame(minHeight: 52)
-            .contentShape(Rectangle())
+    private func menuRow(_ title: String, icon: String) -> some View {
+        Button {} label: {
+            menuContent(title, icon: icon, trailing: AnyView(Image(systemName: "chevron.right").foregroundStyle(AppColors.labelGrey)))
         }
         .buttonStyle(.plain)
     }
+
+    private func menuToggle(_ title: String, icon: String, isOn: Binding<Bool>) -> some View {
+        menuContent(title, icon: icon, trailing: AnyView(Toggle("", isOn: isOn).labelsHidden().tint(AppColors.amberCTA).animation(.spring(), value: isOn.wrappedValue)))
+    }
+
+    private func menuContent(_ title: String, icon: String, trailing: AnyView) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(AppColors.brandGold)
+                .frame(width: 24)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppColors.nearBlack)
+            Spacer()
+            trailing
+        }
+        .padding()
+        .background(AppColors.cardSurface, in: RoundedRectangle(cornerRadius: 12))
+        .cardShadow()
+    }
 }
 
+#if DEBUG
+#Preview("Passenger Shell") {
+    RootView()
+        .environmentObject(AppState())
+        .environmentObject(AuthViewModel(authService: MockAuthService()))
+        .environmentObject(WalletViewModel(walletService: MockWalletService()))
+        .environmentObject(RoutesViewModel(routeService: MockRouteService()))
+        .environmentObject(NFCPaymentViewModel(nfcService: CoreNFCService()))
+}
+#endif

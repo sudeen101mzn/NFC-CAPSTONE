@@ -6,6 +6,7 @@ import Combine
 final class AppState: ObservableObject {
     @Published var selectedTab: MainTab = .home
     @Published var languageCode = "en"
+    @Published var userRole: UserRole = .unauthenticated
 }
 
 enum MainTab: Hashable {
@@ -181,4 +182,3 @@ enum NFCScanState: Equatable {
     case success(NFCPaymentResult)
     case failure(String)
 }
-

@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 @main
 struct BusPayNepalApp: App {
@@ -21,7 +20,5 @@ struct BusPayNepalApp: App {
                 .preferredColorScheme(darkMode ? .dark : nil)
                 .dynamicTypeSize(...DynamicTypeSize.accessibility3)
         }
-        .modelContainer(for: [StoredTransaction.self, StoredTrip.self])
     }
 }
-

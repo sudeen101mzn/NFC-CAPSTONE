@@ -18,7 +18,7 @@ struct TransactionHistoryView: View {
     }
 
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: true) {
             VStack(spacing: 14) {
                 TextField("Search transaction or route", text: $search)
                     .padding()

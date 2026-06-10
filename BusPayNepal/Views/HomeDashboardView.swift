@@ -6,16 +6,52 @@ struct HomeDashboardView: View {
     @EnvironmentObject private var wallet: WalletViewModel
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                header
-                BalanceCard(wallet: wallet.wallet)
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    Text("Bus Pay Nepal")
+                        .font(AppFont.sectionHeading)
+                        .foregroundStyle(AppColors.brandGold)
+                    Spacer()
+                    Image(systemName: "bell")
+                        .font(.title3)
+                        .foregroundStyle(AppColors.nearBlack)
+                }
 
-                quickActions
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Namaste, \(auth.currentUser?.fullName.components(separatedBy: " ").first ?? "User Name")")
+                        .font(AppFont.pageTitle)
+                        .foregroundStyle(AppColors.nearBlack)
+                    Text("Ready for your commute today?")
+                        .font(AppFont.bodySecondary)
+                        .foregroundStyle(AppColors.labelGrey)
+                }
+
+                WalletCard(wallet: wallet.wallet) {
+                    appState.selectedTab = .settings
+                }
 
                 HStack(spacing: 14) {
-                    statCard(title: "Total Trips", value: "\(SampleData.trips.count)", icon: "bus.fill")
-                    statCard(title: "Amount Spent", value: SmartFareFormatter.rupees(100), icon: "creditcard.fill")
+                    Image(systemName: "wave.3.right.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .frame(width: 48, height: 48)
+                        .background(AppColors.successGreen, in: Circle())
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("NFC Active")
+                            .font(.headline.weight(.bold))
+                        Text("Tap device on reader to pay")
+                            .font(AppFont.bodySecondary)
+                            .foregroundStyle(AppColors.labelGrey)
+                    }
+                    Spacer()
+                    StatusBadge(.ready)
+                }
+                .smartCard()
+
+                HStack(spacing: 12) {
+                    StatMiniCard(label: "Total Trips", value: "42")
+                    StatMiniCard(label: "Spent", value: "NPR 4,500")
                 }
 
                 SectionHeader(title: "Recent Trips", actionTitle: "View All") {
@@ -32,97 +68,112 @@ struct HomeDashboardView: View {
             .padding(.bottom, 96)
         }
         .task { await wallet.load() }
-        .background(SmartFareColor.appBackground.ignoresSafeArea())
-    }
-
-    private var header: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Namaste, \(auth.currentUser?.fullName.components(separatedBy: " ").first ?? "Passenger")")
-                    .font(.title2.weight(.bold))
-                Text("Rapid Transit, Seamless Payments")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(SmartFareColor.primaryBlue)
-                .accessibilityLabel("Profile")
-        }
-        .padding(.top, 12)
-    }
-
-    private var quickActions: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(title: "Quick Actions")
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
-                actionTile("Scan NFC", "wave.3.right.circle.fill", SmartFareColor.primaryBlue) { appState.selectedTab = .nfc }
-                actionTile("Top Up Wallet", "plus.circle.fill", SmartFareColor.secondaryTeal) { appState.selectedTab = .settings }
-                actionTile("View Routes", "map.fill", SmartFareColor.warningAmber) { appState.selectedTab = .routes }
-                actionTile("History", "clock.arrow.circlepath", SmartFareColor.successGreen) { appState.selectedTab = .history }
-            }
-        }
-    }
-
-    private func actionTile(_ title: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 14) {
-                Image(systemName: icon)
-                    .font(.title2.weight(.semibold))
-                    .frame(width: 46, height: 46)
-                    .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
-                    .foregroundStyle(color)
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .smartCard()
-        }
-        .buttonStyle(.plain)
-        .pressableScale()
-    }
-
-    private func statCard(title: String, value: String, icon: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(SmartFareColor.primaryBlue)
-                .frame(width: 38, height: 38)
-                .background(SmartFareColor.primaryBlue.opacity(0.12), in: Circle())
-            VStack(alignment: .leading, spacing: 4) {
-                Text(value).font(.headline.weight(.bold))
-                Text(title).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .smartCard()
+        .background(AppColors.pageBackground.ignoresSafeArea())
     }
 }
 
-struct TripRow: View {
-    var trip: Trip
+struct DriverDashboardView: View {
+    @EnvironmentObject private var appState: AppState
+    @State private var online = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "bus")
-                .foregroundStyle(SmartFareColor.primaryBlue)
-                .frame(width: 42, height: 42)
-                .background(SmartFareColor.primaryBlue.opacity(0.12), in: Circle())
-            VStack(alignment: .leading, spacing: 4) {
-                Text(trip.route).font(.subheadline.weight(.semibold))
-                Text(SmartFareFormatter.shortDate.string(from: trip.date))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Namaste, \(SampleData.driver.name)")
+                            .font(AppFont.bodyPrimary)
+                        HStack {
+                            Image(systemName: "bus.fill")
+                                .foregroundStyle(AppColors.brandGold)
+                            Text(SampleData.driver.busPlateNumber)
+                                .font(.headline.weight(.bold))
+                        }
+                    }
+                    Spacer()
+                    Toggle(online ? "Online" : "Offline", isOn: $online)
+                        .labelsHidden()
+                        .tint(AppColors.amberCTA)
+                        .animation(.spring(), value: online)
+                    StatusBadge(online ? .ready : .offline)
+                }
+                .smartCard()
+
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(AppColors.amberCTA, in: Circle())
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("CURRENT ROUTE")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(AppColors.labelGrey)
+                        Text("Patan Dhoka - Ratnapark")
+                            .font(.system(size: 18, weight: .bold))
+                    }
+                    Spacer()
+                }
+                .padding(16)
+                .background(AppColors.cardSurface, in: RoundedRectangle(cornerRadius: AppMetrics.cornerRadiusCard))
+                .overlay(RoundedRectangle(cornerRadius: AppMetrics.cornerRadiusCard).stroke(AppColors.amberCTA, lineWidth: 1))
+
+                HStack(spacing: 12) {
+                    driverMetric("TODAY'S EARNINGS", "NPR 8,200")
+                    driverMetric("PASSENGERS", "145")
+                }
+
+                SectionHeader(title: "Recent Trips", actionTitle: "View All") {
+                    appState.selectedTab = .history
+                }
+                VStack(spacing: 12) {
+                    driverTrip("7:10 AM - 8:05 AM", "Morning Loop", "34 passengers")
+                    driverTrip("8:20 AM - 9:10 AM", "Express Run", "41 passengers")
+                    driverTrip("9:25 AM - 10:15 AM", "Local Route", "28 passengers")
+                }
+            }
+            .padding(20)
+            .padding(.bottom, 96)
+        }
+        .background(AppColors.pageBackground.ignoresSafeArea())
+    }
+
+    private func driverMetric(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(AppColors.labelGrey)
+            Text(value)
+                .font(AppFont.largeNumber)
+                .foregroundStyle(AppColors.nearBlack)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .smartCard()
+    }
+
+    private func driverTrip(_ time: String, _ type: String, _ passengers: String) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(time)
+                    .font(.subheadline.weight(.bold))
+                Text(type)
+                    .font(AppFont.bodySecondary)
+                    .foregroundStyle(AppColors.labelGrey)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 5) {
-                Text(SmartFareFormatter.rupees(trip.fare))
-                    .font(.subheadline.weight(.bold))
-                StatusBadge(title: trip.status, color: SmartFareColor.successGreen)
-            }
+            Text(passengers)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppColors.brandGold)
         }
         .smartCard()
     }
 }
 
+#if DEBUG
+#Preview("Passenger Home") {
+    HomeDashboardView()
+        .environmentObject(AuthViewModel(authService: MockAuthService()))
+        .environmentObject(AppState())
+        .environmentObject(WalletViewModel(walletService: MockWalletService()))
+}
+#endif

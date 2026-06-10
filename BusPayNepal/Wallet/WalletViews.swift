@@ -2,116 +2,105 @@ import SwiftUI
 
 struct WalletView: View {
     @EnvironmentObject private var wallet: WalletViewModel
-    @State private var showRecharge = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                BalanceCard(wallet: wallet.wallet)
-                PrimaryButton(title: "Recharge Wallet", systemImage: "plus.circle") { showRecharge = true }
+        RechargeView()
+            .environmentObject(wallet)
+    }
+}
 
+struct RechargeView: View {
+    @EnvironmentObject private var wallet: WalletViewModel
+    @State private var selectedAmount: Decimal = 500
+    @State private var customAmount = ""
+    @State private var showConfirmation = false
+
+    private let amounts: [Decimal] = [100, 200, 500, 1000, 2000]
+    private var amount: Decimal { Decimal(string: customAmount) ?? selectedAmount }
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 18) {
+                ScreenHeader("Wallet Recharge", showBack: true)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("CURRENT BALANCE")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(AppColors.labelGrey)
+                        Text(SmartFareFormatter.rupees(wallet.wallet.balance))
+                            .font(AppFont.largeNumber)
+                            .foregroundStyle(AppColors.nearBlack)
+                    }
+                    Spacer()
+                    Image(systemName: "wallet.pass.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .frame(width: 50, height: 50)
+                        .background(AppColors.amberCTA, in: Circle())
+                }
+                .smartCard()
+
+                SectionHeader(title: "Enter Amount")
+                HStack {
+                    Text("NPR")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(AppColors.amberCTA)
+                    TextField("0.00", text: $customAmount)
+                        .appKeyboardType(.numberPad)
+                        .font(.system(size: 24, weight: .bold))
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 64)
+                .background(AppColors.cardSurface, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppColors.amberCTA, lineWidth: 1))
+
+                HStack(spacing: 9) {
+                    ForEach(amounts, id: \.self) { item in
+                        Button {
+                            selectedAmount = item
+                            customAmount = ""
+                        } label: {
+                            Text("\(NSDecimalNumber(decimal: item).intValue)")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(AppColors.nearBlack)
+                                .padding(.horizontal, 12)
+                                .frame(height: 36)
+                                .background(AppColors.quickSelectGrey, in: Capsule())
+                                .overlay(Capsule().stroke(amount == item ? AppColors.amberCTA : Color.clear, lineWidth: 1.5))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                SectionHeader(title: "Payment Method")
                 HStack(spacing: 12) {
-                    summary("Recharge", wallet.transactions.filter { $0.type == .recharge }.count, SmartFareColor.successGreen)
-                    summary("Travel", wallet.transactions.filter { $0.type == .travel }.count, SmartFareColor.primaryBlue)
-                    summary("Refund", wallet.transactions.filter { $0.type == .refund }.count, SmartFareColor.warningAmber)
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(AppColors.quickSelectGrey)
+                        .frame(width: 42, height: 42)
+                        .overlay(Text("K").font(.headline.weight(.bold)).foregroundStyle(AppColors.brandGold))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Khalti").font(.headline.weight(.bold))
+                        Text("Instant Pay").font(AppFont.bodySecondary).foregroundStyle(AppColors.labelGrey)
+                    }
+                    Spacer()
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(AppColors.amberCTA)
                 }
+                .padding(16)
+                .background(Color(hex: "EEF3F7"), in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppColors.amberCTA, lineWidth: 1.5))
 
-                Picker("Filter", selection: $wallet.selectedFilter) {
-                    ForEach(TransactionType.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-
-                SectionHeader(title: "Recent Transactions")
-                ForEach(wallet.filteredTransactions) { transaction in
-                    TransactionCard(transaction: transaction)
+                PrimaryButton(title: "Confirm Payment", trailingArrow: true) {
+                    showConfirmation = true
                 }
             }
             .padding(20)
             .padding(.bottom, 96)
         }
-        .navigationTitle("Wallet")
-        .background(SmartFareColor.appBackground.ignoresSafeArea())
-        .sheet(isPresented: $showRecharge) { RechargeView() }
-    }
-
-    private func summary(_ title: String, _ value: Int, _ color: Color) -> some View {
-        VStack(spacing: 6) {
-            Text("\(value)").font(.title3.weight(.bold)).foregroundStyle(color)
-            Text(title).font(.caption).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .smartCard()
-    }
-}
-
-struct RechargeView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var wallet: WalletViewModel
-    @State private var selectedAmount: Decimal = 500
-    @State private var customAmount = ""
-    @State private var method = "Khalti"
-    @State private var showConfirmation = false
-
-    private let amounts: [Decimal] = [100, 200, 500, 1000, 2000]
-    private let methods = ["Khalti", "eSewa", "ConnectIPS"]
-
-    var amount: Decimal {
-        Decimal(string: customAmount) ?? selectedAmount
-    }
-
-    var serviceCharge: Decimal { 0 }
-    var total: Decimal { amount + serviceCharge }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    SectionHeader(title: "Select Amount")
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        ForEach(amounts, id: \.self) { item in
-                            Button {
-                                selectedAmount = item
-                                customAmount = ""
-                            } label: {
-                                Text(SmartFareFormatter.rupees(item))
-                                    .font(.subheadline.weight(.semibold))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(amount == item ? SmartFareColor.primaryBlue : .background, in: RoundedRectangle(cornerRadius: 14))
-                                    .foregroundStyle(amount == item ? .white : .primary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    SmartTextField(title: "Custom Amount", systemImage: "number", text: $customAmount, keyboard: .numberPad)
-
-                    SectionHeader(title: "Payment Method")
-                    ForEach(methods, id: \.self) { item in
-                        Button { method = item } label: {
-                            HStack {
-                                Image(systemName: item == "Khalti" ? "wallet.pass.fill" : item == "eSewa" ? "leaf.fill" : "building.columns.fill")
-                                    .foregroundStyle(SmartFareColor.primaryBlue)
-                                Text(item).fontWeight(.semibold)
-                                Spacer()
-                                Image(systemName: method == item ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(method == item ? SmartFareColor.successGreen : .secondary)
-                            }
-                            .smartCard()
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    PrimaryButton(title: "Continue", systemImage: "arrow.right") { showConfirmation = true }
-                }
-                .padding(20)
-            }
-            .background(SmartFareColor.appBackground.ignoresSafeArea())
-            .navigationTitle("Top Up Wallet")
-            .toolbar { Button("Cancel") { dismiss() } }
-            .navigationDestination(isPresented: $showConfirmation) {
-                PaymentConfirmationView(amount: amount, serviceCharge: serviceCharge, total: total, method: method)
-            }
+        .background(AppColors.pageBackground.ignoresSafeArea())
+        .navigationDestination(isPresented: $showConfirmation) {
+            PaymentConfirmationView(amount: amount, serviceCharge: 0, total: amount, method: "Khalti")
         }
     }
 }
@@ -122,83 +111,162 @@ struct PaymentConfirmationView: View {
     let serviceCharge: Decimal
     let total: Decimal
     let method: String
+    @State private var showSuccess = false
 
     var body: some View {
-        VStack(spacing: 20) {
-            VStack(spacing: 12) {
-                paymentRow("Recharge Amount", SmartFareFormatter.rupees(amount))
-                paymentRow("Service Charge", SmartFareFormatter.rupees(serviceCharge))
-                paymentRow("Total Amount", SmartFareFormatter.rupees(total))
-                paymentRow("Payment Method", method)
-            }
-            .smartCard()
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 18) {
+                ScreenHeader("Bus Pay Nepal", showBack: true, trailing: AnyView(Circle().fill(AppColors.quickSelectGrey).frame(width: 40, height: 40).overlay(Image(systemName: "person.fill").foregroundStyle(AppColors.labelGrey))))
 
-            switch wallet.paymentStatus {
-            case .idle:
-                PrimaryButton(title: "Confirm Payment", systemImage: "checkmark") {
-                    Task { await wallet.recharge(amount: amount, method: method) }
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Transaction Summary")
+                        .font(AppFont.sectionHeading)
+                        .foregroundStyle(AppColors.nearBlack)
+                    summaryRow("Recharge Amount", SmartFareFormatter.rupees(amount), .primary)
+                    summaryRow("Service Charge", SmartFareFormatter.rupees(serviceCharge), AppColors.successGreen)
+                    DashedDivider()
+                    HStack {
+                        Text("Total Amount").font(.headline.weight(.bold))
+                        Spacer()
+                        Text(SmartFareFormatter.rupees(total))
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(AppColors.amberCTA)
+                    }
                 }
-                SecondaryButton(title: "Cancel Payment", systemImage: "xmark") {}
-            case .processing:
-                ProgressView("Processing Payment...")
-                    .padding(30)
+                .smartCard()
+                .background(DiagonalPattern().opacity(0.18))
+
+                HStack(spacing: 12) {
+                    Image(systemName: "wallet.pass.fill")
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(AppColors.amberCTA, in: Circle())
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("KHALTI WALLET INFORMATION")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(AppColors.labelGrey)
+                        Text("Account: 98********")
+                            .font(.headline.weight(.bold))
+                    }
+                    Spacer()
+                    Image(systemName: "checkmark.shield.fill")
+                        .foregroundStyle(AppColors.successGreen)
+                }
+                .smartCard()
+
+                StatusBadge(.ready)
                     .frame(maxWidth: .infinity)
-                    .smartCard()
-            case .success(let transaction):
-                PaymentSuccessView(transaction: transaction)
-            case .failed(let reason):
-                PaymentFailureView(reason: reason) {
-                    Task { await wallet.recharge(amount: amount, method: method) }
+
+                PrimaryButton(title: "Confirm Payment", trailingArrow: true) {
+                    Task {
+                        await wallet.recharge(amount: amount, method: method)
+                        showSuccess = true
+                    }
+                }
+                Button("Cancel") {}
+                    .font(AppFont.bodySecondary.weight(.semibold))
+                    .foregroundStyle(AppColors.labelGrey)
+                    .frame(maxWidth: .infinity)
+            }
+            .padding(20)
+        }
+        .background(AppColors.pageBackground.ignoresSafeArea())
+        .navigationDestination(isPresented: $showSuccess) {
+            RechargeSuccessView(amount: amount, method: "Khalti")
+        }
+    }
+
+    private func summaryRow(_ title: String, _ value: String, _ color: Color) -> some View {
+        HStack {
+            Text(title).foregroundStyle(AppColors.labelGrey)
+            Spacer()
+            Text(value).fontWeight(.bold).foregroundStyle(color)
+        }
+        .font(AppFont.bodyPrimary)
+    }
+}
+
+struct RechargeSuccessView: View {
+    let amount: Decimal
+    let method: String
+
+    var body: some View {
+        VStack(spacing: 22) {
+            Spacer()
+            Image(systemName: "checkmark")
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 72, height: 72)
+                .background(AppColors.successGreen, in: Circle())
+            Text("Recharge Successful")
+                .font(.system(size: 26, weight: .bold))
+            Text("\(SmartFareFormatter.rupees(amount)) has been added to your wallet")
+                .font(AppFont.bodySecondary)
+                .foregroundStyle(AppColors.labelGrey)
+            Divider()
+            HStack {
+                Text("UPDATED WALLET BALANCE")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(AppColors.labelGrey)
+                Text("NPR 1,750")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(AppColors.brandGold)
+            }
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Transaction ID").font(AppFont.bodySecondary).foregroundStyle(AppColors.labelGrey)
+                    Text("#SF-RECH-99283").font(.subheadline.weight(.bold))
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 5) {
+                    Text("Payment Method").font(AppFont.bodySecondary).foregroundStyle(AppColors.labelGrey)
+                    HStack {
+                        RoundedRectangle(cornerRadius: 4).fill(AppColors.quickSelectGrey).frame(width: 18, height: 18)
+                        Text(method).font(.subheadline.weight(.bold))
+                    }
                 }
             }
+            PrimaryButton(title: "View Transaction", systemImage: "doc.text") {}
+            SecondaryButton(title: "Back to Home", systemImage: "house.fill") {}
             Spacer()
+            Label("Securely processed by SmartFare Nepal", systemImage: "checkmark.shield")
+                .font(.system(size: 12))
+                .foregroundStyle(AppColors.labelGrey)
         }
-        .padding(20)
-        .background(SmartFareColor.appBackground.ignoresSafeArea())
-        .navigationTitle("Confirm Payment")
-    }
-
-    private func paymentRow(_ title: String, _ value: String) -> some View {
-        HStack {
-            Text(title).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).fontWeight(.semibold)
-        }
+        .padding(24)
+        .background(AppColors.cardSurface.ignoresSafeArea())
+        .navigationBarBackButtonHidden(true)
     }
 }
 
-struct PaymentSuccessView: View {
-    var transaction: Transaction
-
+struct DashedDivider: View {
     var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "checkmark.seal.fill").font(.system(size: 64)).foregroundStyle(SmartFareColor.successGreen)
-            Text("Payment Successful").font(.title3.weight(.bold))
-            Text("Amount Added: \(SmartFareFormatter.rupees(transaction.amount))")
-            Text("Transaction ID: \(transaction.id.uuidString.prefix(8))")
-            Text("Payment Method: \(transaction.method)")
-            HStack {
-                SecondaryButton(title: "View Transaction", systemImage: "doc.text") {}
-                SecondaryButton(title: "Back Home", systemImage: "house") {}
+        Rectangle()
+            .stroke(style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
+            .foregroundStyle(AppColors.inputBorder)
+            .frame(height: 1)
+    }
+}
+
+struct DiagonalPattern: View {
+    var body: some View {
+        GeometryReader { proxy in
+            Path { path in
+                let spacing: CGFloat = 18
+                var x: CGFloat = -proxy.size.height
+                while x < proxy.size.width {
+                    path.move(to: CGPoint(x: x, y: proxy.size.height))
+                    path.addLine(to: CGPoint(x: x + proxy.size.height, y: 0))
+                    x += spacing
+                }
             }
+            .stroke(AppColors.inputBorder, lineWidth: 1)
         }
-        .smartCard()
     }
 }
 
-struct PaymentFailureView: View {
-    var reason: String
-    var retry: () -> Void
-
-    var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "xmark.octagon.fill").font(.system(size: 58)).foregroundStyle(SmartFareColor.errorRed)
-            Text("Payment Failed").font(.title3.weight(.bold))
-            Text(reason).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            PrimaryButton(title: "Retry Payment", systemImage: "arrow.clockwise", action: retry)
-            SecondaryButton(title: "Contact Support", systemImage: "phone") {}
-        }
-        .smartCard()
-    }
+#if DEBUG
+#Preview("Recharge") {
+    NavigationStack { RechargeView().environmentObject(WalletViewModel(walletService: MockWalletService())) }
 }
-
+#endif

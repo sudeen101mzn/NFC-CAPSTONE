@@ -1,5 +1,10 @@
 import Foundation
-import SwiftData
+
+enum UserRole: String, Codable, CaseIterable {
+    case unauthenticated
+    case passenger
+    case driver
+}
 
 struct User: Identifiable, Codable, Hashable {
     let id: UUID
@@ -54,10 +59,12 @@ struct Transaction: Identifiable, Codable, Hashable {
 struct Trip: Identifiable, Codable, Hashable {
     let id: UUID
     var route: String
+    var subtitle: String
     var date: Date
     var fare: Decimal
     var status: String
     var terminalID: String
+    var iconName: String
 }
 
 struct BusRoute: Identifiable, Codable, Hashable {
@@ -82,7 +89,6 @@ struct NFCPaymentResult: Identifiable, Hashable {
     var scannedAt: Date
 }
 
-@Model
 final class StoredTransaction {
     var id: UUID
     var date: Date
@@ -103,22 +109,25 @@ final class StoredTransaction {
     }
 }
 
-@Model
 final class StoredTrip {
     var id: UUID
     var route: String
+    var subtitle: String
     var date: Date
     var fare: Decimal
     var status: String
     var terminalID: String
+    var iconName: String
 
     init(trip: Trip) {
         self.id = trip.id
         self.route = trip.route
+        self.subtitle = trip.subtitle
         self.date = trip.date
         self.fare = trip.fare
         self.status = trip.status
         self.terminalID = trip.terminalID
+        self.iconName = trip.iconName
     }
 }
 
@@ -133,17 +142,27 @@ enum SampleData {
         profileImageName: nil
     )
 
+    static let driver = DriverProfile(
+        id: UUID(),
+        name: "Rajesh",
+        phone: "9812345678",
+        email: "rajesh@smartfare.test",
+        busPlateNumber: "BA 2 PA 1234",
+        licenseNumber: "LIC-90281",
+        verificationStatus: .notVerified
+    )
+
     static let wallet = Wallet(balance: 1250, commuterID: "BPN-2048-77", isVerified: true, nfcEnabled: true)
 
     static let routes: [BusRoute] = [
-        .init(id: UUID(), number: "01", name: "Ratnapark - Bouddha", origin: "Ratnapark", destination: "Bouddha", fare: 45, estimatedDuration: "32 min", activeBusCount: 12, stops: ["Ratnapark", "Putalisadak", "Gaushala", "Bouddha"]),
-        .init(id: UUID(), number: "04", name: "Lagankhel - Chabahil", origin: "Lagankhel", destination: "Chabahil", fare: 55, estimatedDuration: "44 min", activeBusCount: 8, stops: ["Lagankhel", "Jawalakhel", "Tripureshwor", "Chabahil"]),
-        .init(id: UUID(), number: "12", name: "Kalanki - Airport", origin: "Kalanki", destination: "Airport", fare: 65, estimatedDuration: "50 min", activeBusCount: 6, stops: ["Kalanki", "Kalimati", "New Baneshwor", "Airport"])
+        .init(id: UUID(), number: "102", name: "Route 102", origin: "Patan Dhoka", destination: "Ratnapark", fare: 25, estimatedDuration: "25m", activeBusCount: 4, stops: ["Patan Dhoka", "Pulchowk", "Tripureshwor", "Ratnapark"]),
+        .init(id: UUID(), number: "A1", name: "Route A1", origin: "Koteshwor", destination: "Baneshwor", fare: 30, estimatedDuration: "35m", activeBusCount: 7, stops: ["Koteshwor", "Tinkune", "New Baneshwor", "Baneshwor"])
     ]
 
     static let trips: [Trip] = [
-        .init(id: UUID(), route: "Ratnapark - Bouddha", date: .now.addingTimeInterval(-3600), fare: 45, status: "Completed", terminalID: "TERM-BP-014"),
-        .init(id: UUID(), route: "Lagankhel - Chabahil", date: .now.addingTimeInterval(-86400), fare: 55, status: "Completed", terminalID: "TERM-LG-022")
+        .init(id: UUID(), route: "Line 102 Bus", subtitle: "Patan Dhoka to Ratnapark", date: .now.addingTimeInterval(-3600), fare: 25, status: "Completed", terminalID: "TERM-BP-014", iconName: "bus"),
+        .init(id: UUID(), route: "Blue Line Metro", subtitle: "Koteshwor to Baneshwor", date: .now.addingTimeInterval(-86400), fare: 45, status: "Completed", terminalID: "TERM-LG-022", iconName: "tram"),
+        .init(id: UUID(), route: "Eco-Rickshaw", subtitle: "Jawalakhel local loop", date: .now.addingTimeInterval(-172800), fare: 15, status: "Completed", terminalID: "TERM-RK-011", iconName: "figure.walk")
     ]
 
     static let transactions: [Transaction] = [
@@ -152,4 +171,3 @@ enum SampleData {
         .init(id: UUID(), date: .now.addingTimeInterval(-172800), route: "Refund", amount: 25, type: .refund, status: "Success", method: "System")
     ]
 }
-
