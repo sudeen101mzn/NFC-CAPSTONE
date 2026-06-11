@@ -14,9 +14,10 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useIsFocused } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { LanguageProvider, useLanguage } from './src/hooks/useLanguage';
+import { ThemeProvider, useTheme } from './src/hooks/useTheme';
 import LanguageSelector from './src/components/LanguageSelector';
 import nfcManager from './src/services/nfc/nfcmanager';
 
@@ -26,6 +27,8 @@ const STORAGE_KEYS = {
   token: 'token',
   user: 'user',
   accounts: 'registered_accounts',
+  walletBalance: 'wallet_balance',
+  walletLastRecharge: 'wallet_last_recharge',
 };
 
 const createPublicUser = (account) => ({
@@ -38,12 +41,23 @@ const createPublicUser = (account) => ({
 const normalizeIdentifier = (value = '') => value.trim().toLowerCase();
 
 const getStoredAccounts = async () => {
-  const storedAccounts = await AsyncStorage.getItem(STORAGE_KEYS.accounts);
-  return storedAccounts ? JSON.parse(storedAccounts) : [];
+  try {
+    const storedAccounts = await AsyncStorage.getItem(STORAGE_KEYS.accounts);
+    const parsed = storedAccounts ? JSON.parse(storedAccounts) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('Failed to read stored accounts:', error);
+    return [];
+  }
 };
 
-const saveStoredAccounts = (accounts) =>
-  AsyncStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(accounts));
+const saveStoredAccounts = async (accounts) => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(accounts));
+  } catch (error) {
+    console.error('Failed to save stored accounts:', error);
+  }
+};
 
 // ============ API CONFIGURATION ============
 const API_BASE_URL = 'http://192.168.1.100:3000/api/v1'; // Change this!
@@ -116,7 +130,10 @@ const api = {
     }
     
     if (endpoint === '/wallet/balance') {
-      return { success: true, data: { balance: 1250, cardNumber: '1234********5678', lastRechargeDate: '2024-06-01' } };
+      const storedBalance = await AsyncStorage.getItem(STORAGE_KEYS.walletBalance);
+      const balance = storedBalance ? parseFloat(storedBalance) : 1250;
+      const lastRechargeDate = await AsyncStorage.getItem(STORAGE_KEYS.walletLastRecharge) || '2024-06-01';
+      return { success: true, data: { balance, cardNumber: '1234********5678', lastRechargeDate } };
     }
     
     if (endpoint === '/transactions') {
@@ -133,7 +150,14 @@ const api = {
     }
     
     if (endpoint === '/recharge') {
-      return { success: true, data: { transactionId: 'TXN' + Date.now(), newBalance: 1750 } };
+      const amount = Number(data.amount) || 0;
+      const storedBalance = await AsyncStorage.getItem(STORAGE_KEYS.walletBalance);
+      const currentBalance = storedBalance ? parseFloat(storedBalance) : 1250;
+      const newBalance = currentBalance + amount;
+      await AsyncStorage.setItem(STORAGE_KEYS.walletBalance, String(newBalance));
+      const rechargeDate = new Date().toISOString();
+      await AsyncStorage.setItem(STORAGE_KEYS.walletLastRecharge, rechargeDate);
+      return { success: true, data: { transactionId: 'TXN' + Date.now(), newBalance, rechargeDate } };
     }
     
     throw new Error('API endpoint not implemented');
@@ -195,7 +219,6 @@ const AuthProvider = ({ children }) => {
     try {
       const response = await api.post('/auth/register', userData);
       if (response.success) {
-        await saveSession(response.data.token, response.data.user);
         return { success: true };
       }
       return { success: false, error: 'Registration failed' };
@@ -241,17 +264,19 @@ const LoginScreen = ({ navigation }) => {
   const { t } = useLanguage();
 
   const handleLogin = async () => {
-    if (!identifier || !password) {
+    const normalizedIdentifier = identifier.trim();
+
+    if (!normalizedIdentifier || !password) {
       Alert.alert(t('common.error'), t('errors.fill_all_fields'));
       return;
     }
 
-    const result = await login(identifier, password);
+    const result = await login(normalizedIdentifier, password);
     if (result.success) {
       return;
-    } else {
-      Alert.alert(t('common.error'), t('errors.invalid_credentials'));
     }
+
+    Alert.alert(t('common.error'), t('errors.invalid_credentials'));
   };
 
   return (
@@ -365,6 +390,7 @@ const RegisterScreen = ({ navigation }) => {
     const result = await register(form);
     if (result.success) {
       Alert.alert(t('common.success'), t('errors.registration_success'));
+      navigation.navigate('Login');
     } else {
       Alert.alert(t('common.error'), t('errors.registration_failed'));
     }
@@ -636,7 +662,8 @@ const NFCScanScreen = ({ navigation }) => {
 const DashboardScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
-  const [balance, setBalance] = useState(1250);
+  const isFocused = useIsFocused();
+  const [balance, setBalance] = useState(0);
   const [cardNumber, setCardNumber] = useState('**** **** **** 5678');
   const [lastRechargeDate, setLastRechargeDate] = useState('Jun 1, 2024');
   const [transactions, setTransactions] = useState([]);
@@ -644,8 +671,10 @@ const DashboardScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (isFocused) {
+      loadDashboardData();
+    }
+  }, [isFocused]);
 
   const loadDashboardData = async () => {
     setIsLoading(true);
@@ -834,15 +863,29 @@ const RechargeScreen = ({ navigation }) => {
   const [customAmount, setCustomAmount] = useState('');
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [balance, setBalance] = useState(1250);
+  const [balance, setBalance] = useState(0);
+  const [rechargeInfo, setRechargeInfo] = useState(null);
   const { t } = useLanguage();
+
+  useEffect(() => {
+    loadWalletData();
+  }, []);
+
+  const loadWalletData = async () => {
+    try {
+      const response = await api.post('/wallet/balance', {});
+      if (response.success) {
+        setBalance(response.data.balance);
+      }
+    } catch (error) {
+      console.error('Load wallet balance failed:', error);
+    }
+  };
 
   const rechargeAmounts = [100, 200, 500, 1000, 2000, 5000];
 
   const paymentMethods = [
     { id: 'khalti', name: t('recharge.khalti'), icon: 'wallet', color: '#0F4C81' },
-    { id: 'esewa', name: t('recharge.esewa'), icon: 'credit-card', color: '#2A9D8F' },
-    { id: 'connectips', name: t('recharge.connectips'), icon: 'bank', color: '#F4A261' },
   ];
 
   const getTotalAmount = () => {
@@ -868,8 +911,19 @@ const RechargeScreen = ({ navigation }) => {
     try {
       const response = await api.post('/recharge', { amount, method: selectedMethod });
       if (response.success) {
-        Alert.alert(t('common.success'), t('recharge.success_message').replace('{amount}', amount));
-        navigation.goBack();
+        const previousBalance = balance;
+        const newBalance = response.data?.newBalance ?? previousBalance + amount;
+        setBalance(newBalance);
+        setRechargeInfo({ previousBalance, addedAmount: amount, newBalance });
+        setSelectedAmount(null);
+        setCustomAmount('');
+        setSelectedMethod(null);
+
+        Alert.alert(
+          t('common.success'),
+          `${t('recharge.success_message').replace('{amount}', amount)}\n${t('recharge.added_balance_message') || `Added NPR ${amount} to current balance.`}\n${t('recharge.new_balance_message') || `New balance: NPR ${newBalance}.`}`
+        );
+        navigation.navigate('Dashboard');
       }
     } catch (error) {
       Alert.alert(t('common.error'), t('errors.recharge_failed'));
@@ -893,6 +947,20 @@ const RechargeScreen = ({ navigation }) => {
           <Text style={styles.balanceCardLabel}>{t('recharge.current_balance')}</Text>
           <Text style={styles.balanceCardAmount}>NPR {balance.toLocaleString()}</Text>
         </View>
+
+        {rechargeInfo && (
+          <View style={styles.rechargeInfoBox}>
+            <Text style={styles.rechargeInfoLabel}>{t('recharge.added_balance_title') || 'Balance added'}</Text>
+            <Text style={styles.rechargeInfoText}>
+              {t('recharge.added_balance_summary')
+                ? t('recharge.added_balance_summary')
+                    .replace('{added}', rechargeInfo.addedAmount)
+                    .replace('{previous}', rechargeInfo.previousBalance)
+                    .replace('{newBalance}', rechargeInfo.newBalance)
+                : `Added NPR ${rechargeInfo.addedAmount} to previous balance NPR ${rechargeInfo.previousBalance}. New balance NPR ${rechargeInfo.newBalance}.`}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('recharge.select_amount')}</Text>
@@ -1122,6 +1190,7 @@ const RoutesScreen = ({ navigation }) => {
 const ProfileScreen = ({ navigation }) => {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
+  const { theme, isDark, setLightTheme, setDarkTheme } = useTheme();
   const [balance, setBalance] = useState(1250);
   const [cardNumber, setCardNumber] = useState('**** **** **** 5678');
 
@@ -1151,15 +1220,15 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()}><Icon name="arrow-left" size={24} color="#1F2937" /></TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('profile.title')}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>      
+      <View style={[styles.headerBar, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}> 
+        <TouchableOpacity onPress={() => navigation.goBack()}><Icon name="arrow-left" size={24} color={theme.colors.text} /></TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{t('profile.title')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView>
-        <View style={styles.profileHeader}>
+        <View style={[styles.profileHeader, { backgroundColor: theme.colors.surface }]}> 
           <View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>{user?.fullName?.charAt(0) || 'U'}</Text></View>
           <Text style={styles.profileName}>{user?.fullName || 'User'}</Text>
           <Text style={styles.profileEmail}>{user?.email || 'user@example.com'}</Text>
@@ -1176,6 +1245,47 @@ const ProfileScreen = ({ navigation }) => {
             <Icon name="credit-card" size={24} color="#0F4C81" />
             <View><Text style={styles.walletInfoLabel}>{t('dashboard.card_number')}</Text><Text style={styles.walletInfoValue}>{cardNumber}</Text></View>
           </View>
+        </View>
+
+        <View style={[styles.themeSection, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>          
+          <View style={styles.themeHeader}>
+            <Icon name="theme-light-dark" size={22} color={theme.colors.primary} />
+            <Text style={[styles.themeTitle, { color: theme.colors.text }]}>Theme</Text>
+          </View>
+
+          <View style={styles.themeToggleContainer}>
+            <TouchableOpacity
+              style={[
+                styles.themeOption,
+                styles.themeOptionLeft,
+                {
+                  backgroundColor: !isDark ? theme.colors.primary : theme.colors.surfaceGray,
+                  borderColor: !isDark ? theme.colors.primary : theme.colors.border,
+                },
+              ]}
+              onPress={setLightTheme}
+            >
+              <Text style={[styles.themeOptionText, { color: !isDark ? '#FFFFFF' : theme.colors.text }]}>{t('light') || 'Light'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.themeOption,
+                styles.themeOptionRight,
+                {
+                  backgroundColor: isDark ? theme.colors.primary : theme.colors.surfaceGray,
+                  borderColor: isDark ? theme.colors.primary : theme.colors.border,
+                },
+              ]}
+              onPress={setDarkTheme}
+            >
+              <Text style={[styles.themeOptionText, { color: isDark ? '#FFFFFF' : theme.colors.text }]}>{t('dark') || 'Dark'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[styles.themeDescription, { color: theme.colors.textSecondary }]}>
+            {isDark ? 'Dark mode is active. Easier on your eyes at night.' : 'Light mode is active. Bright and clear for daytime use.'}
+          </Text>
         </View>
 
         <View style={styles.menuSection}>
@@ -1234,13 +1344,15 @@ const AppNavigator = () => {
 // ============ MAIN APP ============
 export default function App() {
   return (
-    <NavigationContainer>
-      <LanguageProvider>
-        <AuthProvider>
-          <AppNavigator />
-        </AuthProvider>
-      </LanguageProvider>
-    </NavigationContainer>
+    <ThemeProvider>
+      <NavigationContainer>
+        <LanguageProvider>
+          <AuthProvider>
+            <AppNavigator />
+          </AuthProvider>
+        </LanguageProvider>
+      </NavigationContainer>
+    </ThemeProvider>
   );
 }
 
@@ -1348,6 +1460,9 @@ const styles = StyleSheet.create({
   totalRow: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
   totalLabel: { fontSize: 16, fontWeight: 'bold', color: '#1F2937' },
   totalValue: { fontSize: 16, fontWeight: 'bold', color: '#81480f' },
+  rechargeInfoBox: { marginHorizontal: 16, padding: 16, backgroundColor: '#E5F2FF', borderRadius: 14, marginBottom: 16 },
+  rechargeInfoLabel: { fontSize: 14, fontWeight: '700', color: '#0F4C81', marginBottom: 6 },
+  rechargeInfoText: { fontSize: 13, color: '#1F2937', lineHeight: 20 },
   payButton: { flexDirection: 'row', backgroundColor: '#E63946', margin: 16, padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 8 },
   payButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
   filterBar: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
@@ -1388,6 +1503,15 @@ const styles = StyleSheet.create({
   profileName: { fontSize: 20, fontWeight: 'bold', color: '#1F2937', marginBottom: 4 },
   profileEmail: { fontSize: 14, color: '#6B7280', marginBottom: 2 },
   profilePhone: { fontSize: 14, color: '#6B7280' },
+  themeSection: { marginHorizontal: 20, marginBottom: 20, borderRadius: 20, borderWidth: 1, padding: 16 },
+  themeHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  themeTitle: { marginLeft: 10, fontSize: 16, fontWeight: '700' },
+  themeToggleContainer: { flexDirection: 'row' },
+  themeOption: { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  themeOptionLeft: { marginRight: 10 },
+  themeOptionRight: { marginLeft: 10 },
+  themeOptionText: { fontSize: 14, fontWeight: '600' },
+  themeDescription: { marginTop: 12, fontSize: 13, lineHeight: 20 },
   walletInfoCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', margin: 16, padding: 20, borderRadius: 16, justifyContent: 'space-around' },
   walletInfoItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   walletDivider: { width: 1, backgroundColor: '#E5E7EB' },
