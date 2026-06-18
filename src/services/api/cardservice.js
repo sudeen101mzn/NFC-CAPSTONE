@@ -1,18 +1,28 @@
 import apiClient from './apiClient';
 
 const cardService = {
-  getCardDetails: async () => {
-    const response = await apiClient.get('/cards');
+  getCardDetails: async (cardId) => {
+    const response = await apiClient.get(`/cards/${cardId}`);
     return response.data;
   },
 
   getCards: async () => {
+    const response = await apiClient.get('/cards');
+    return response.data;
+  },
+
+  getAllCards: async () => {
     const response = await apiClient.get('/cards/all');
     return response.data;
   },
 
   addCard: async (cardData) => {
     const response = await apiClient.post('/cards', cardData);
+    return response.data;
+  },
+
+  updateCard: async (cardId, cardData) => {
+    const response = await apiClient.patch(`/cards/${cardId}`, cardData);
     return response.data;
   },
 
@@ -28,6 +38,11 @@ const cardService = {
 
   setDefaultCard: async (cardId) => {
     const response = await apiClient.patch(`/cards/${cardId}/default`);
+    return response.data;
+  },
+
+  deleteCard: async (cardId) => {
+    const response = await apiClient.delete(`/cards/${cardId}`);
     return response.data;
   },
 };

@@ -5,6 +5,13 @@ const morgan = require('morgan');
 const dotenv = require('dotenv');
 
 const authRoutes = require('./routes/auth.routes');
+const cardRoutes = require('./routes/card.routes');
+const transactionRoutes = require('./routes/transaction.routes');
+const routeRoutes = require('./routes/route.routes');
+const notificationRoutes = require('./routes/notification.routes');
+const userRoutes = require('./routes/user.routes');
+const paymentRoutes = require('./routes/payment.routes');
+const rechargeRoutes = require('./routes/recharge.routes');
 const { errorHandler, notFoundHandler } = require('./middleware/error.middleware');
 
 dotenv.config();
@@ -25,6 +32,13 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/cards', cardRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/routes', routeRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/payment', paymentRoutes);
+app.use('/api/recharge', rechargeRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
