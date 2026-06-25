@@ -50,10 +50,6 @@ router.get(
 
 protect,
 
-authorize(
-'admin'
-),
-
 getRoutes
 );
 

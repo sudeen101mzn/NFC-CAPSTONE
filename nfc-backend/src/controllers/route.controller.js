@@ -1,6 +1,32 @@
 const Route =
 require('../models/route.model');
 
+const serializeRoute = (route, index = 0) => {
+    const stopNames = (route.stops || [])
+        .map((stop) => stop && typeof stop === 'object' ? stop.name : stop?.name)
+        .filter(Boolean);
+
+    const fromStop = stopNames[0] || null;
+    const toStop = stopNames[stopNames.length - 1] || null;
+    const distance = Math.max((stopNames.length || 1) - 1, 1);
+    const fare = 15 + (distance * 10);
+    const routeName = route.name;
+    const routeNumberMatch = routeName && routeName.match(/\d+/);
+
+    return {
+        id: route._id,
+        routeNumber: routeNumberMatch ? routeNumberMatch[0] : `R-${index + 1}`,
+        routeName,
+        fromStop,
+        toStop,
+        distance,
+        fare,
+        stops: route.stops || [],
+        createdAt: route.createdAt,
+        updatedAt: route.updatedAt,
+    };
+};
+
 
 // CREATE ROUTE
 exports.createRoute =
@@ -26,7 +52,7 @@ stops
 
 res
 .status(201)
-.json(route);
+.json(serializeRoute(route));
 
 }
 
@@ -56,7 +82,7 @@ await Route
 .populate('stops');
 
 res
-.json(routes);
+.json(routes.map((route, index) => serializeRoute(route, index)));
 
 }
 

@@ -7,7 +7,9 @@ require('../middleware/auth.middleware');
 
 const {
     getProfile,
-    getMyTransactions
+    getMyTransactions,
+    updateProfile,
+    changePassword
 } =
 require('../controllers/user.controller');
 
@@ -21,6 +23,18 @@ router.get(
     '/transactions',
     protect,
     getMyTransactions
+);
+
+router.put(
+    '/profile',
+    protect,
+    updateProfile
+);
+
+router.put(
+    '/change-password',
+    protect,
+    changePassword
 );
 
 module.exports = router;

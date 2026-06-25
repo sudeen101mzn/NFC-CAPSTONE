@@ -5,7 +5,7 @@ export const processRecharge = async (rechargeData) => {
     if (!rechargeData) {
       throw new Error('Recharge data is required');
     }
-    const response = await apiClient.post('/recharge', rechargeData);
+    const response = await apiClient.post('/wallet/recharge', rechargeData);
     return response.data;
   } catch (error) {
     console.error('[RechargeService] Process Recharge Error:', error.message);
@@ -15,8 +15,9 @@ export const processRecharge = async (rechargeData) => {
 
 export const getRechargeHistory = async () => {
   try {
-    const response = await apiClient.get('/recharge/history');
-    return response.data || [];
+    const response = await apiClient.get('/transactions');
+    const transactions = response.data?.transactions || response.data || [];
+    return transactions.filter((transaction) => transaction.type === 'credit');
   } catch (error) {
     console.error('[RechargeService] Get Recharge History Error:', error.message);
     throw error;

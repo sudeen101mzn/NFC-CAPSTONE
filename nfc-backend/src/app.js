@@ -11,6 +11,7 @@ const syncRoutes = require('./routes/sync.routes');
 const adminRoutes = require('./routes/admin.routes');
 const routeRoutes = require('./routes/route.routes');
 const userRoutes = require('./routes/user.routes');
+const { getTransactionSummary } = require('./controllers/user.controller');
 
 const app = express();
 
@@ -36,7 +37,9 @@ app.use('/api/nfc', nfcRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/route', routeRoutes);
+app.use('/api/routes', routeRoutes);
 app.use('/api/user', userRoutes);
+app.get('/api/transactions', protect, getTransactionSummary);
 
 // Root health-check
 app.get('/', (req, res) => {

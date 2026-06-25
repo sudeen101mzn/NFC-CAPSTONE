@@ -20,6 +20,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { LanguageProvider, useLanguage } from './src/hooks/useLanguage';
 import LanguageSelector from './src/components/LanguageSelector';
 import nfcManager from './src/services/nfc/nfcmanager';
+import { API_CONFIG } from './src/constants/config';
 
 const Stack = createStackNavigator();
 
@@ -31,16 +32,7 @@ const STORAGE_KEYS = {
 };
 
 // ============ API CONFIGURATION ============
-// For Android Emulator use: http://10.0.2.2:5000/api
-// For iOS Simulator use:    http://localhost:5000/api
-// For physical device use:  http://<your-machine-ip>:5000/api
-// Port must match your backend server.js PORT (default 3000)
-// Android emulator: 10.0.2.2 maps to your host machine's localhost
-// iOS simulator:    localhost works directly
-// Physical device:  replace with your machine's local IP e.g. 192.168.1.x
-const API_BASE_URL = Platform.OS === 'android'
-  ? 'http://10.0.2.2:3000/api'
-  : 'http://localhost:3000/api';
+const API_BASE_URL = API_CONFIG.BASE_URL;
 
 // ============ API CLIENT ============
 const buildHeaders = (token) => {
@@ -229,7 +221,7 @@ const AuthProvider = ({ children }) => {
   const login = async (identifier, password) => {
     setIsLoading(true);
     try {
-      const res = await api.post('/auth/login', { identifier, password });
+      const res = await api.post('/auth/login', { identifier, email: identifier, password });
       const authToken = res.token || res.data?.token;
       const authUser  = res.user  || res.data?.user;
       if (!authToken || !authUser) throw new Error('Login succeeded but server did not return token/user.');
@@ -246,7 +238,7 @@ const AuthProvider = ({ children }) => {
     setIsLoading(true);
     try {
       const res = await api.post('/auth/register', {
-        fullName: userData.fullName,
+        name: userData.fullName,
         email: userData.email,
         mobileNumber: userData.mobileNumber,
         password: userData.password,
