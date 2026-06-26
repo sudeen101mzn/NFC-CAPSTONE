@@ -4,6 +4,7 @@ const generateToken = require('../utils/generateToken');
 
 const buildUserPayload = (user) => ({
     _id: user._id,
+    accountCode: user._id.toString().slice(-8).toUpperCase(),
     name: user.name,
     fullName: user.name,
     mobileNumber: user.mobileNumber,

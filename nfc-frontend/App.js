@@ -643,6 +643,7 @@ const DashboardScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
   const [balance, setBalance] = useState(null);
+  const [isBalanceVisible, setIsBalanceVisible] = useState(true);
   const [cardNumber, setCardNumber] = useState('');
   const [lastRechargeDate, setLastRechargeDate] = useState('');
   const [transactions, setTransactions] = useState([]);
@@ -714,9 +715,23 @@ const DashboardScreen = ({ navigation }) => {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>{t('dashboard.wallet_balance')}</Text>
+          <View style={styles.balanceHeaderRow}>
+            <Text style={styles.balanceLabel}>{t('dashboard.wallet_balance')}</Text>
+            <TouchableOpacity
+              style={styles.balanceToggleButton}
+              onPress={() => setIsBalanceVisible((prev) => !prev)}
+              accessibilityRole="button"
+              accessibilityLabel={isBalanceVisible ? 'Hide wallet balance' : 'Show wallet balance'}
+            >
+              <Icon
+                name={isBalanceVisible ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.balanceAmount}>
-            NPR {balance !== null ? balance.toLocaleString() : '—'}
+            NPR {balance !== null ? (isBalanceVisible ? balance.toLocaleString() : '••••••') : '—'}
           </Text>
           <View style={styles.cardFooter}>
             <View>
@@ -1566,8 +1581,10 @@ const styles = StyleSheet.create({
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#0F4C8120', justifyContent: 'center', alignItems: 'center' },
   avatarText: { fontSize: 18, fontWeight: 'bold', color: '#0F4C81' },
   balanceCard: { backgroundColor: '#0F4C81', margin: 16, padding: 20, borderRadius: 20, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  balanceHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   balanceLabel: { fontSize: 12, color: '#FFFFFFCC', marginBottom: 8 },
-  balanceAmount: { fontSize: 36, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 20 },
+  balanceToggleButton: { padding: 4, marginBottom: 4 },
+  balanceAmount: { fontSize: 36, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 20, marginTop: 2 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 16, borderTopWidth: 1, borderTopColor: '#FFFFFF20' },
   cardFooterLabel: { fontSize: 10, color: '#FFFFFF99', marginBottom: 4 },
   cardFooterValue: { fontSize: 12, fontWeight: '500', color: '#FFFFFF' },

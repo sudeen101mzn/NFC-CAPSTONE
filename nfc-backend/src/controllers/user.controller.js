@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 
 const buildUserPayload = (user) => ({
     _id: user._id,
+    accountCode: user._id.toString().slice(-8).toUpperCase(),
     name: user.name,
     fullName: user.name,
     mobileNumber: user.mobileNumber,
