@@ -47,7 +47,6 @@ const userSchema = new mongoose.Schema({
 
     nfcUid: {
         type: String,
-        unique: true,
         default: null
     },
 
@@ -58,5 +57,15 @@ const userSchema = new mongoose.Schema({
     }
 
 }, { timestamps: true });
+
+userSchema.index(
+    { nfcUid: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            nfcUid: { $type: 'string', $ne: '' }
+        }
+    }
+);
 
 module.exports = mongoose.model('User', userSchema);
