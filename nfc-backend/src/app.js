@@ -11,6 +11,7 @@ const syncRoutes = require('./routes/sync.routes');
 const adminRoutes = require('./routes/admin.routes');
 const routeRoutes = require('./routes/route.routes');
 const userRoutes = require('./routes/user.routes');
+const transactionRoutes = require('./routes/transaction.routes');
 
 const app = express();
 
@@ -43,7 +44,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/route', routeRoutes);
 app.use('/api/user', userRoutes);
-
+app.use('/api/transactions', transactionRoutes);
 
 // Protected test route
 app.get('/protected', protect, (req, res) => {

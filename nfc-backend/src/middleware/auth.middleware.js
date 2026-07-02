@@ -6,6 +6,7 @@ exports.protect = async (req, res, next) => {
     try {
 
         let token;
+console.log(req.headers,"Header_request");
 
         if (
             req.headers.authorization &&
