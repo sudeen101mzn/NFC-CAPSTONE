@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getTransactionHistory, getRecentTransactions } from '../../services/api/transactionService';
+import { getTransactionHistory, getRecentTransactions } from '../../services/api/transactionservice';
 
 const initialState = {
   transactions: [],

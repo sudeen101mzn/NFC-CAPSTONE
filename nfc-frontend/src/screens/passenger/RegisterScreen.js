@@ -12,7 +12,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
 import { showMessage } from 'react-native-flash-message';
-import { register } from '../../store/slices/authSlice';
+import { register } from '../../store/slices/authslice';
 import InputField from '../../components/forms/InputField';
 import PasswordInput from '../../components/forms/PasswordInput';
 import PhoneInput from '../../components/forms/PhoneInput';

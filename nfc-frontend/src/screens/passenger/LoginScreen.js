@@ -1,3 +1,5 @@
+import { useDispatch } from 'react-redux';
+import { login } from '../../store/slices/authslice';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -17,6 +19,8 @@ import {
 const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
+  const dispatch = useDispatch();
+
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -35,12 +39,41 @@ export default function LoginScreen({ navigation }) {
     ]).start();
   }, []);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    console.log('Button clicked - phone:', phone, 'password:', password);
+    
+    if (!phone || !password) {
+      alert('Please enter email and password');
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      navigation.navigate('Dashboard');
-    }, 1500);
+
+    try {
+      console.log('Attempting login with:', { email: phone, password });
+      
+      const result = await dispatch(
+        login({
+          email: phone,
+          password,
+        })
+      );
+
+      console.log('Login result:', result);
+
+      if (login.fulfilled.match(result)) {
+        alert('Login Successful');
+        navigation.navigate('Dashboard');
+      } else {
+        alert(result.payload || 'Invalid email or password');
+      }
+
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Login failed: ' + error.message);
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -83,9 +116,7 @@ export default function LoginScreen({ navigation }) {
           </View>
           <Text style={styles.appTitle}>TapFare</Text>
           <Text style={styles.appSub}>Bus Fare Management</Text>
-        </Animated.View>
-
-        {/* Form card — Instagram-style */}
+        </Animated.View>m card */
         <Animated.View
           style={[
             styles.card,
@@ -97,14 +128,14 @@ export default function LoginScreen({ navigation }) {
         >
           <Text style={styles.cardTitle}>Log in</Text>
 
-          {/* Phone input */}
+          {/* Email input */}
           <View style={[styles.inputWrap, focused === 'phone' && styles.inputFocused]}>
             <Text style={styles.inputIcon}>📱</Text>
             <TextInput
               style={styles.input}
-              placeholder="Phone number or email"
+              placeholder="Email"
               placeholderTextColor="#aaa"
-              keyboardType="phone-pad"
+              keyboardType="email-address"
               value={phone}
               onChangeText={setPhone}
               onFocus={() => setFocused('phone')}
@@ -137,18 +168,16 @@ export default function LoginScreen({ navigation }) {
           </TouchableOpacity>
 
           {/* Login button */}
-          <TouchableOpacity
-            style={[styles.loginBtn, (!phone || !password) && styles.loginBtnDisabled]}
-            onPress={handleLogin}
-            disabled={loading || !phone || !password}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.loginBtnText}>Log In</Text>
-            )}
-          </TouchableOpacity>
+         <TouchableOpacity
+  style={styles.loginBtn}
+  onPress={() => {
+    alert('BUTTON PRESSED');
+    console.log('BUTTON PRESSED');
+  }}
+  activeOpacity={0.85}
+>
+  <Text style={styles.loginBtnText}>Log In</Text>
+</TouchableOpacity>
 
           {/* Divider */}
           <View style={styles.divider}>
@@ -164,7 +193,7 @@ export default function LoginScreen({ navigation }) {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Register link — Instagram style bottom bar */}
+        {/* Register link */}
         <View style={styles.registerBar}>
           <Text style={styles.registerBarText}>Don't have an account? </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Register')}>
@@ -386,4 +415,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-});
+}); 

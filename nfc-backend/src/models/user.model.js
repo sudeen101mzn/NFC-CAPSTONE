@@ -48,7 +48,7 @@ const userSchema = new mongoose.Schema({
     nfcUid: {
         type: String,
         unique: true,
-        default: null
+         sparse: true
     },
 
     role: {
@@ -59,4 +59,4 @@ const userSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.model('User', userSchema); 

@@ -10,7 +10,7 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
-  Platform,
+  Platform, 
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';

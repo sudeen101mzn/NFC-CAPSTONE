@@ -12,6 +12,9 @@ const adminRoutes = require('./routes/admin.routes');
 const routeRoutes = require('./routes/route.routes');
 const userRoutes = require('./routes/user.routes');
 const transactionRoutes = require('./routes/transaction.routes');
+const stopRoutes = require('./routes/stop.routes');
+const busRoutes = require('./routes/bus.routes');
+const driverRoutes = require('./routes/driver.routes');
 
 const app = express();
 
@@ -42,9 +45,13 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/nfc', nfcRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/route', routeRoutes);
-app.use('/api/user', userRoutes);
+app.use('/api/routes', routeRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/stops', stopRoutes);
+app.use('/api/buses', busRoutes);
+app.use('/api/drivers', driverRoutes);
+
 
 // Protected test route
 app.get('/protected', protect, (req, res) => {
@@ -56,7 +63,7 @@ app.get('/protected', protect, (req, res) => {
 
 // Root route
 app.get('/', (req, res) => {
-    res.send('NFC Backend Running 🚀');
+    res.send('NFC Backend Running');
 });
 
 module.exports = app;
