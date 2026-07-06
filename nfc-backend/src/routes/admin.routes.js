@@ -10,7 +10,8 @@ require('../middleware/role.middleware');
 
 const {
     getAllUsers,
-    getAllTransactions
+    getAllTransactions,
+    getDashboard
 } =
 require('../controllers/admin.controller');
 
@@ -23,14 +24,7 @@ router.get(
 
     authorize('admin'),
 
-    (req, res) => {
-
-        res.json({
-            message: 'Welcome Admin',
-            user: req.user
-        });
-
-    }
+    getDashboard
 
 );
 
