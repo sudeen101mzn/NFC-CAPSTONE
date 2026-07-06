@@ -11,7 +11,13 @@ require('../middleware/role.middleware');
 const {
     getAllUsers,
     getAllTransactions,
-    getDashboard
+    getDashboard,
+    getRevenueReport,
+    getPassengerReport,
+    getTransactionReport,
+    getBusReport,
+    getRouteReport,
+    getAnalytics
 } =
 require('../controllers/admin.controller');
 
@@ -54,3 +60,82 @@ router.get(
 
 
 module.exports = router;
+
+// REVENUE REPORT
+router.get(
+
+    '/reports/revenue',
+
+    protect,
+
+    authorize('admin'),
+
+    getRevenueReport
+
+);
+
+// PASSENGER REPORT
+router.get(
+
+    '/reports/passengers',
+
+    protect,
+
+    authorize('admin'),
+
+    getPassengerReport
+
+);
+
+//TRANSACTION REPORT
+
+router.get(
+
+    '/reports/transactions',
+
+    protect,
+
+    authorize('admin'),
+
+    getTransactionReport
+
+);
+
+// BUS REPORT
+router.get(
+
+    '/reports/buses',
+
+    protect,
+
+    authorize('admin'),
+
+    getBusReport
+
+);
+
+// ROUTE REPORT
+router.get(
+
+    '/reports/routes',
+
+    protect,
+
+    authorize('admin'),
+
+    getRouteReport
+
+);
+
+// COMPLETE ANALYTICS
+router.get(
+
+    '/analytics',
+
+    protect,
+
+    authorize('admin'),
+
+    getAnalytics
+
+);

@@ -66,7 +66,7 @@ app.get('/', (req, res) => {
     res.send('NFC Backend Running');
 });
 
-module.exports = app;
+
 
 const saveOfflineTransaction = require('./utils/offlineStorage');
 
@@ -84,3 +84,5 @@ app.get('/test-offline', (req, res) => {
     });
 
 });
+
+module.exports = app;
