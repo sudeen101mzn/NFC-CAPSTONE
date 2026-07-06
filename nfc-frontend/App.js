@@ -63,6 +63,10 @@ const handleResponse = async (response) => {
   return json || {};
 };
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_REGEX = /^[0-9]{10}$/;
+const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+
 const api = {
   async post(endpoint, data, token = null) {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -407,12 +411,16 @@ const RegisterScreen = ({ navigation }) => {
       Alert.alert(t('common.error'), t('errors.fill_all_fields'));
       return;
     }
-    if (form.mobileNumber.length !== 10) {
+    if (!EMAIL_REGEX.test(form.email.trim())) {
+      Alert.alert(t('common.error'), t('errors.invalid_email'));
+      return;
+    }
+    if (!MOBILE_REGEX.test(form.mobileNumber.trim())) {
       Alert.alert(t('common.error'), t('errors.invalid_mobile'));
       return;
     }
-    if (form.password.length < 6) {
-      Alert.alert(t('common.error'), t('errors.password_min_length'));
+    if (!STRONG_PASSWORD_REGEX.test(form.password)) {
+      Alert.alert(t('common.error'), t('errors.password_strength'));
       return;
     }
     if (form.password !== form.confirmPassword) {
@@ -643,7 +651,6 @@ const DashboardScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
   const [balance, setBalance] = useState(null);
-  const [isBalanceVisible, setIsBalanceVisible] = useState(true);
   const [cardNumber, setCardNumber] = useState('');
   const [lastRechargeDate, setLastRechargeDate] = useState('');
   const [transactions, setTransactions] = useState([]);
@@ -652,7 +659,9 @@ const DashboardScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', loadDashboardData);
+    return unsubscribe;
+  }, [navigation]);
 
   const loadDashboardData = async () => {
     setIsLoading(true);
@@ -715,23 +724,9 @@ const DashboardScreen = ({ navigation }) => {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.balanceCard}>
-          <View style={styles.balanceHeaderRow}>
-            <Text style={styles.balanceLabel}>{t('dashboard.wallet_balance')}</Text>
-            <TouchableOpacity
-              style={styles.balanceToggleButton}
-              onPress={() => setIsBalanceVisible((prev) => !prev)}
-              accessibilityRole="button"
-              accessibilityLabel={isBalanceVisible ? 'Hide wallet balance' : 'Show wallet balance'}
-            >
-              <Icon
-                name={isBalanceVisible ? 'eye-off-outline' : 'eye-outline'}
-                size={20}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.balanceLabel}>{t('dashboard.wallet_balance')}</Text>
           <Text style={styles.balanceAmount}>
-            NPR {balance !== null ? (isBalanceVisible ? balance.toLocaleString() : '••••••') : '—'}
+            NPR {balance !== null ? balance.toLocaleString() : '—'}
           </Text>
           <View style={styles.cardFooter}>
             <View>
@@ -870,7 +865,7 @@ const RechargeScreen = ({ navigation }) => {
     setIsLoading(true);
     try {
       const data = await api.post('/wallet/recharge', { amount, method: selectedMethod }, token);
-      // Backend should return: { newBalance, transactionId }
+      setBalance(data.wallet?.balance ?? data.currentBalance ?? balance);
       Alert.alert(t('common.success'), t('recharge.success_message').replace('{amount}', amount));
       navigation.goBack();
     } catch (error) {
@@ -1186,6 +1181,16 @@ const EditProfileScreen = ({ navigation }) => {
       return;
     }
 
+    if (!EMAIL_REGEX.test(form.email.trim())) {
+      Alert.alert(t('common.error'), t('errors.invalid_email'));
+      return;
+    }
+
+    if (!MOBILE_REGEX.test(form.mobileNumber.trim())) {
+      Alert.alert(t('common.error'), t('errors.invalid_mobile'));
+      return;
+    }
+
     setIsLoading(true);
     try {
       const data = await api.put('/user/profile', {
@@ -1418,8 +1423,8 @@ const ChangePasswordScreen = ({ navigation }) => {
       Alert.alert(t('common.error'), t('errors.fill_all_fields'));
       return;
     }
-    if (form.newPassword.length < 6) {
-      Alert.alert(t('common.error'), t('errors.password_min_length'));
+    if (!STRONG_PASSWORD_REGEX.test(form.newPassword)) {
+      Alert.alert(t('common.error'), t('errors.password_strength'));
       return;
     }
     if (form.newPassword !== form.confirmPassword) {
@@ -1581,10 +1586,8 @@ const styles = StyleSheet.create({
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#0F4C8120', justifyContent: 'center', alignItems: 'center' },
   avatarText: { fontSize: 18, fontWeight: 'bold', color: '#0F4C81' },
   balanceCard: { backgroundColor: '#0F4C81', margin: 16, padding: 20, borderRadius: 20, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
-  balanceHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   balanceLabel: { fontSize: 12, color: '#FFFFFFCC', marginBottom: 8 },
-  balanceToggleButton: { padding: 4, marginBottom: 4 },
-  balanceAmount: { fontSize: 36, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 20, marginTop: 2 },
+  balanceAmount: { fontSize: 36, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 20 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 16, borderTopWidth: 1, borderTopColor: '#FFFFFF20' },
   cardFooterLabel: { fontSize: 10, color: '#FFFFFF99', marginBottom: 4 },
   cardFooterValue: { fontSize: 12, fontWeight: '500', color: '#FFFFFF' },

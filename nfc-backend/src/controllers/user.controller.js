@@ -2,6 +2,10 @@ const User = require('../models/user.model');
 const Transaction = require('../models/transaction.model');
 const bcrypt = require('bcryptjs');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MOBILE_REGEX = /^[0-9]{10}$/;
+const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+
 const buildUserPayload = (user) => ({
     _id: user._id,
     accountCode: user._id.toString().slice(-8).toUpperCase(),
@@ -154,10 +158,23 @@ exports.updateProfile = async (req, res) => {
         const { fullName, name, email, mobileNumber } = req.body;
         const resolvedName = fullName || name;
         const normalizedEmail = email?.toLowerCase();
+        const normalizedMobile = String(mobileNumber || '').trim();
 
-        if (!resolvedName || !normalizedEmail || !mobileNumber) {
+        if (!resolvedName || !normalizedEmail || !normalizedMobile) {
             return res.status(400).json({
                 message: 'Name, email, and mobile number are required'
+            });
+        }
+
+        if (!EMAIL_REGEX.test(normalizedEmail)) {
+            return res.status(400).json({
+                message: 'Please enter a valid email address'
+            });
+        }
+
+        if (!MOBILE_REGEX.test(normalizedMobile)) {
+            return res.status(400).json({
+                message: 'Please enter a valid 10-digit mobile number'
             });
         }
 
@@ -172,6 +189,17 @@ exports.updateProfile = async (req, res) => {
             });
         }
 
+        const existingMobile = await User.findOne({
+            mobileNumber: normalizedMobile,
+            _id: { $ne: req.user._id }
+        });
+
+        if (existingMobile) {
+            return res.status(400).json({
+                message: 'Mobile number is already registered'
+            });
+        }
+
         const user = await User.findById(req.user._id);
 
         if (!user) {
@@ -182,7 +210,7 @@ exports.updateProfile = async (req, res) => {
 
         user.name = resolvedName;
         user.email = normalizedEmail;
-        user.mobileNumber = mobileNumber;
+        user.mobileNumber = normalizedMobile;
 
         await user.save();
 
@@ -204,6 +232,12 @@ exports.changePassword = async (req, res) => {
         if (!currentPassword || !newPassword) {
             return res.status(400).json({
                 message: 'Current password and new password are required'
+            });
+        }
+
+        if (!STRONG_PASSWORD_REGEX.test(newPassword)) {
+            return res.status(400).json({
+                message: 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character'
             });
         }
 

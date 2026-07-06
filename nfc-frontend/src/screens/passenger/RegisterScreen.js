@@ -19,6 +19,8 @@ import PhoneInput from '../../components/forms/PhoneInput';
 import PrimaryButton from '../../components/buttons/PrimaryButton';
 import { colors, typography, spacing } from '../../constants/theme';
 
+const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+
 const RegisterScreen = ({ navigation }) => {
   const dispatch = useDispatch();
   const { isLoading } = useSelector((state) => state.auth);
@@ -141,9 +143,12 @@ const RegisterScreen = ({ navigation }) => {
             rules={{
               required: 'Password is required',
               minLength: {
-                value: 6,
-                message: 'Password must be at least 6 characters',
+                value: 8,
+                message: 'Password must be at least 8 characters',
               },
+              validate: (value) =>
+                STRONG_PASSWORD_REGEX.test(value) ||
+                'Password must include uppercase, lowercase, number, and special character',
             }}
             render={({ field: { onChange, value } }) => (
               <PasswordInput
