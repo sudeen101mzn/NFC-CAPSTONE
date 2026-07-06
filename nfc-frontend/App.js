@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,9 @@ import {
   ActivityIndicator,
   Switch,
   Platform,
+  Animated,
+  Easing,
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,10 +22,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { LanguageProvider, useLanguage } from './src/hooks/useLanguage';
 import LanguageSelector from './src/components/LanguageSelector';
-import nfcManager from './src/services/nfc/nfcmanager';
 import { API_CONFIG } from './src/constants/config';
 
 const Stack = createStackNavigator();
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ============ STORAGE KEYS ============
 const STORAGE_KEYS = {
@@ -69,29 +72,50 @@ const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).
 
 const api = {
   async post(endpoint, data, token = null) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: buildHeaders(token),
-      body: JSON.stringify(data),
-    });
-    return handleResponse(response);
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: buildHeaders(token),
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    } catch (error) {
+      throw new Error(
+        `Unable to reach the backend at ${API_BASE_URL}. ` +
+        'Check that the backend server is running and that the mobile device can reach the host.'
+      );
+    }
   },
 
   async get(endpoint, token = null) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'GET',
-      headers: buildHeaders(token),
-    });
-    return handleResponse(response);
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'GET',
+        headers: buildHeaders(token),
+      });
+      return handleResponse(response);
+    } catch (error) {
+      throw new Error(
+        `Unable to reach the backend at ${API_BASE_URL}. ` +
+        'Check that the backend server is running and that the mobile device can reach the host.'
+      );
+    }
   },
 
   async put(endpoint, data, token = null) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'PUT',
-      headers: buildHeaders(token),
-      body: JSON.stringify(data),
-    });
-    return handleResponse(response);
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'PUT',
+        headers: buildHeaders(token),
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    } catch (error) {
+      throw new Error(
+        `Unable to reach the backend at ${API_BASE_URL}. ` +
+        'Check that the backend server is running and that the mobile device can reach the host.'
+      );
+    }
   },
 };
 
@@ -531,114 +555,182 @@ const RegisterScreen = ({ navigation }) => {
 const NFCScanScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
-  const [scanState, setScanState] = useState('starting');
-  const [tagInfo, setTagInfo] = useState(null);
-  const [errorMessage, setErrorMessage] = useState('');
+  const pulse1 = useRef(new Animated.Value(1)).current;
+  const pulse2 = useRef(new Animated.Value(1)).current;
+  const pulse3 = useRef(new Animated.Value(1)).current;
+  const shimmer = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    let isActive = true;
-    const beginScan = async () => {
-      setScanState('starting');
-      setErrorMessage('');
-      try {
-        const supported = await nfcManager.init();
-        if (!isActive) return;
-        if (!supported) {
-          const message = Platform.OS === 'ios'
-            ? 'NFC is not available on this iPhone or in this build.'
-            : 'NFC is not supported on this device.';
-          setScanState('error');
-          setErrorMessage(message);
-          return;
-        }
-        if (!nfcManager.isEnabled) {
-          const message = 'NFC is turned off. Please enable NFC and try again.';
-          setScanState('error');
-          setErrorMessage(message);
-          return;
-        }
-        setScanState('scanning');
-        const tag = await nfcManager.startScanning();
-        if (!isActive) return;
-        setTagInfo(tag);
-        setScanState('success');
-        Alert.alert(t('common.success'), t('nfc.scan_success'));
-      } catch (error) {
-        if (!isActive) return;
-        setScanState('error');
-        setErrorMessage(error?.message || t('nfc.scan_failed'));
-      } finally {
-        await nfcManager.stopScanning();
-      }
-    };
-    beginScan();
-    return () => {
-      isActive = false;
-      nfcManager.cleanup();
-    };
-  }, [t]);
-
-  const retryScan = () => {
-    setTagInfo(null);
-    setErrorMessage('');
-    setScanState('starting');
-    setTimeout(async () => {
-      try {
-        setScanState('scanning');
-        const tag = await nfcManager.startScanning();
-        setTagInfo(tag);
-        setScanState('success');
-      } catch (error) {
-        setScanState('error');
-        setErrorMessage(error?.message || t('nfc.scan_failed'));
-      } finally {
-        await nfcManager.stopScanning();
-      }
-    }, 0);
-  };
-
-  const tagId = tagInfo?.id || tagInfo?.tagID || 'N/A';
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmer, {
+          toValue: 0,
+          duration: 1800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer]);
+  const contentOpacity = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.88, 1],
+  });
+  const topGlow = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.22, 0.42],
+  });
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.headerBar, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={24} color={colors.text} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <View style={[styles.headerBar, { backgroundColor: colors.background, borderBottomColor: 'transparent' }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.scanBackButton, { backgroundColor: colors.surface }]}>
+          <Icon name="arrow-left" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('nfc.title')}</Text>
-        <View style={{ width: 24 }} />
+        <View style={{ alignItems: 'center', flex: 1 }}>
+          <Text style={[styles.scanHeaderTitle, { color: colors.text }]}>Scan Your NFC Card</Text>
+          <Text style={[styles.scanHeaderSubtitle, { color: colors.subtext }]}>Manage your travel card with a single tap.</Text>
+        </View>
+        <View style={{ width: 44 }} />
       </View>
 
-      <View style={styles.nfcScanContainer}>
-        <View style={[
-          styles.nfcScanIcon,
-          scanState === 'success' && styles.nfcScanIconSuccess,
-          scanState === 'error' && styles.nfcScanIconError,
-        ]}>
-          <Icon
-            name={scanState === 'success' ? 'check' : scanState === 'error' ? 'alert-circle' : 'nfc'}
-            size={52}
-            color="#FFFFFF"
-          />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scanScrollContent}
+      >
+        <Animated.View style={[styles.heroCard, { backgroundColor: colors.surface, opacity: contentOpacity }]}>
+          <Animated.View style={[styles.heroGlow, { opacity: topGlow }]} />
+          <View style={styles.heroIllustrationWrap}>
+            <Animated.View
+              style={[
+                styles.heroPulseOuter,
+                { transform: [{ scale: pulse3 }], opacity: pulse3.interpolate({ inputRange: [1, 1.38], outputRange: [0.32, 0] }) },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.heroPulseMiddle,
+                { transform: [{ scale: pulse2 }], opacity: pulse2.interpolate({ inputRange: [1, 1.38], outputRange: [0.45, 0] }) },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.heroPulseInner,
+                { transform: [{ scale: pulse1 }], opacity: pulse1.interpolate({ inputRange: [1, 1.38], outputRange: [0.62, 0] }) },
+              ]}
+            />
+            <View style={styles.heroDevice}>
+              <View style={styles.heroDeviceSpeaker} />
+              <View style={styles.heroNfcBadge}>
+                <Icon name="nfc" size={36} color="#0F4C81" />
+              </View>
+              <View style={styles.heroWaveSet}>
+                <View style={styles.heroWaveLine} />
+                <View style={[styles.heroWaveLine, styles.heroWaveLineShort]} />
+                <View style={[styles.heroWaveLine, styles.heroWaveLineShorter]} />
+              </View>
+            </View>
+            <View style={styles.heroCardToken}>
+              <Icon name="credit-card-chip" size={26} color="#0F4C81" />
+            </View>
+          </View>
+          <Text style={[styles.heroHeading, { color: colors.text }]}>Scan Your NFC Card</Text>
+          <Text style={[styles.heroDescription, { color: colors.subtext }]}>
+            Hold your NFC travel card against the back of your phone to securely connect it with the app. Once your card is detected, you'll be able to view your card details, check your balance, top up your wallet, and manage your travel information.
+          </Text>
+        </Animated.View>
+
+        <View style={styles.sectionBlock}>
+          <Text style={[styles.sectionTitleLarge, { color: colors.text }]}>What You Can Do</Text>
+          <Text style={[styles.sectionHint, { color: colors.subtext }]}>
+            Everything you need to manage your card in one place.
+          </Text>
+          <View style={styles.featureGrid}>
+            {[
+              { icon: 'credit-card-outline', title: 'View Card Details', desc: 'See your card information, including its unique card ID and current status.' },
+              { icon: 'cash-multiple', title: 'Check Your Balance', desc: 'Instantly view the available balance on your travel card before you travel.' },
+              { icon: 'plus-circle-outline', title: 'Top Up Your Card', desc: 'Add funds to your NFC card quickly and securely through the app.' },
+              { icon: 'bus-marker', title: 'Travel with Tap In & Tap Out', desc: 'Use your NFC card to board and exit buses. The correct fare will be deducted automatically based on your journey.' },
+              { icon: 'history', title: 'View Transaction History', desc: 'Review your recent top-ups, fare deductions, and travel history anytime.' },
+              { icon: 'shield-check-outline', title: 'Manage Your Card', desc: 'Monitor your card status and securely manage your travel account.' },
+            ].map((feature) => (
+              <View key={feature.title} style={[styles.featureCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={styles.featureIconWrap}>
+                  <Icon name={feature.icon} size={22} color="#0F4C81" />
+                </View>
+                <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
+                <Text style={[styles.featureDesc, { color: colors.subtext }]}>{feature.desc}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-        <Text style={[styles.nfcScanTitle, { color: colors.text }]}>
-          {scanState === 'success' ? t('nfc.scan_success') : scanState === 'error' ? t('nfc.scan_failed') : t('nfc.ready_to_scan')}
-        </Text>
-        <Text style={[styles.nfcScanText, { color: colors.subtext }]}>
-          {scanState === 'success' ? `Tag ID: ${tagId}` : scanState === 'error' ? errorMessage : t('nfc.hold_nfc')}
-        </Text>
-        {(scanState === 'error' || scanState === 'success') && (
-          <TouchableOpacity style={styles.registerButton} onPress={retryScan}>
-            <Text style={styles.registerButtonText}>{t('nfc.start_scanning')}</Text>
-            <Icon name="nfc" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        )}
-        {scanState === 'scanning' && (
-          <TouchableOpacity style={[styles.logoutButton, { backgroundColor: colors.logoutBg }]} onPress={() => navigation.goBack()}>
-            <Icon name="close" size={22} color="#E63946" />
-            <Text style={styles.logoutText}>{t('nfc.cancel_scan')}</Text>
-          </TouchableOpacity>
-        )}
+
+        <View style={styles.sectionBlock}>
+          <Text style={[styles.sectionTitleLarge, { color: colors.text }]}>How to Scan</Text>
+          <View style={[styles.stepCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {[
+              'Enable NFC on your phone.',
+              'Tap Start Scanning.',
+              'Hold your NFC card against the back of your phone.',
+              'Keep the card still until the scan is complete.',
+              "Your card information will appear automatically.",
+            ].map((step, index) => (
+              <View key={step} style={styles.stepRow}>
+                <View style={styles.stepNumberWrap}>
+                  <Text style={styles.stepNumberText}>{index + 1}</Text>
+                </View>
+                <Text style={[styles.stepText, { color: colors.text }]}>{step}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.sectionBlock}>
+          <Text style={[styles.sectionTitleLarge, { color: colors.text }]}>Helpful Tips</Text>
+          <View style={[styles.tipCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {[
+              'Keep the card flat against the NFC area of your phone.',
+              "Remove thick phone cases if the card isn't detected.",
+              'Ensure NFC is enabled on your device.',
+              'Hold the card steady for a few seconds during scanning.',
+            ].map((tip) => (
+              <View key={tip} style={styles.tipRow}>
+                <Icon name="information-outline" size={18} color="#2A9D8F" />
+                <Text style={[styles.tipText, { color: colors.subtext }]}>{tip}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={[styles.noteCard, { backgroundColor: '#EAF2FF', borderColor: '#B8D4FF' }]}>
+          <Icon name="lock-check-outline" size={22} color="#0F4C81" />
+          <Text style={styles.noteText}>
+            Scanning your NFC card does not deduct any money. It simply allows the app to read your card so you can check your balance, top up your card, view transaction history, and manage your travel information securely.
+          </Text>
+        </View>
+      </ScrollView>
+
+      <View style={[styles.scanFooter, { backgroundColor: colors.background }]}>
+        <TouchableOpacity
+          style={styles.startScanButton}
+          onPress={() => Alert.alert(
+            'NFC Guide',
+            'This page explains how NFC scanning works. Use your dedicated scan flow when you are ready to read a card.'
+          )}
+          activeOpacity={0.9}
+        >
+          <Icon name="nfc" size={22} color="#FFFFFF" />
+          <Text style={styles.startScanButtonText}>Start Scanning</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -1697,6 +1789,203 @@ const styles = StyleSheet.create({
   walletDivider: { width: 1 },
   walletInfoLabel: { fontSize: 12 },
   walletInfoValue: { fontSize: 16, fontWeight: 'bold' },
+  scanScrollContent: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 140 },
+  scanBackButton: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  scanHeaderTitle: { fontSize: 18, fontWeight: '800' },
+  scanHeaderSubtitle: { fontSize: 12, marginTop: 2, textAlign: 'center' },
+  heroCard: {
+    borderRadius: 28,
+    padding: 22,
+    marginBottom: 20,
+    overflow: 'hidden',
+    shadowColor: '#0F4C81',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 5,
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: -50,
+    right: -30,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: '#D7E8FF',
+  },
+  heroIllustrationWrap: { alignItems: 'center', justifyContent: 'center', height: 240, marginBottom: 8 },
+  heroPulseOuter: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    borderWidth: 2,
+    borderColor: '#9CC2FF',
+  },
+  heroPulseMiddle: {
+    position: 'absolute',
+    width: 166,
+    height: 166,
+    borderRadius: 83,
+    borderWidth: 2,
+    borderColor: '#C6DDFF',
+  },
+  heroPulseInner: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    borderColor: '#DDEBFF',
+  },
+  heroDevice: {
+    width: 128,
+    height: 190,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2ECFF',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 14,
+    shadowColor: '#0F4C81',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  heroDeviceSpeaker: { width: 42, height: 5, borderRadius: 3, backgroundColor: '#D7E3F4', marginBottom: 12 },
+  heroNfcBadge: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    backgroundColor: '#EDF4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroWaveSet: { marginTop: 16, alignItems: 'center', gap: 8 },
+  heroWaveLine: { width: 56, height: 3, borderRadius: 99, backgroundColor: '#0F4C81', opacity: 0.85 },
+  heroWaveLineShort: { width: 42, opacity: 0.55 },
+  heroWaveLineShorter: { width: 28, opacity: 0.32 },
+  heroCardToken: {
+    position: 'absolute',
+    right: 10,
+    bottom: 20,
+    width: 68,
+    height: 68,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#DCE9FF',
+    shadowColor: '#0F4C81',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  heroHeading: { fontSize: 28, fontWeight: '800', textAlign: 'center', marginBottom: 10 },
+  heroDescription: { fontSize: 14, lineHeight: 22, textAlign: 'center' },
+  sectionBlock: { marginBottom: 20 },
+  sectionTitleLarge: { fontSize: 20, fontWeight: '800', marginBottom: 6 },
+  sectionHint: { fontSize: 13, lineHeight: 20, marginBottom: 14 },
+  featureGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  featureCard: {
+    width: '48%',
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  featureIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#EAF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  featureTitle: { fontSize: 14, fontWeight: '700', lineHeight: 20, marginBottom: 6 },
+  featureDesc: { fontSize: 12, lineHeight: 18 },
+  stepCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 16,
+  },
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 },
+  stepNumberWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#0F4C81',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    marginTop: 1,
+  },
+  stepNumberText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  stepText: { flex: 1, fontSize: 14, lineHeight: 21 },
+  tipCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 16,
+  },
+  tipRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, gap: 10 },
+  tipText: { flex: 1, fontSize: 13, lineHeight: 20 },
+  noteCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 16,
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  noteText: { flex: 1, fontSize: 13, lineHeight: 21, color: '#0F4C81' },
+  scanFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 18,
+    borderTopWidth: 1,
+    borderTopColor: '#E6ECF5',
+  },
+  startScanButton: {
+    minHeight: 58,
+    borderRadius: 18,
+    backgroundColor: '#0F4C81',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    shadowColor: '#0F4C81',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    elevation: 5,
+  },
+  startScanButtonDisabled: { opacity: 0.6 },
+  startScanButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  scanStatusCard: {
+    marginTop: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  scanStatusText: { fontSize: 13, fontWeight: '700', flex: 1, lineHeight: 18 },
+  scanStatusSubText: { fontSize: 12, marginTop: 2, lineHeight: 17 },
   nfcScanContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   nfcScanIcon: { width: 112, height: 112, borderRadius: 56, backgroundColor: '#0F4C81', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
   nfcScanIconSuccess: { backgroundColor: '#2A9D8F' },

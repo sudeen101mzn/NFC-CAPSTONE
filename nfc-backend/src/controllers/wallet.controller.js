@@ -1,28 +1,14 @@
 const User = require('../models/user.model');
 const Transaction = require('../models/transaction.model');
 
-const buildWalletPayload = async (userId) => {
-    const user = await User.findById(userId);
-    const lastRecharge = await Transaction.findOne({
-        user: userId,
-        type: 'credit'
-    }).sort({ createdAt: -1 });
-
-    return {
-        balance: user?.balance || 0,
-        cardNumber: user?.nfcUid || '',
-        lastRechargeDate: lastRecharge ? lastRecharge.createdAt : null
-    };
-};
-
 exports.rechargeWallet = async (req, res) => {
 
     try {
 
         const { amount } = req.body;
-        const rechargeAmount = Number(amount);
+        const parsedAmount = Number(amount);
 
-        if (!rechargeAmount || rechargeAmount <= 0) {
+        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
             return res.status(400).json({
                 message: 'Invalid recharge amount'
             });
@@ -36,24 +22,20 @@ exports.rechargeWallet = async (req, res) => {
             });
         }
 
-        user.balance += rechargeAmount;
+        user.balance += parsedAmount;
+        await Transaction.create({
+            user: req.user._id,
+            type: 'credit',
+            fare: parsedAmount
+        });
 
         await user.save();
 
-        const transaction = await Transaction.create({
-            user: user._id,
-            type: 'credit',
-            sourceStop: null,
-            destinationStop: null,
-            fare: rechargeAmount
-        });
-
         res.json({
             message: 'Wallet recharged successfully',
-            addedAmount: rechargeAmount,
+            addedAmount: parsedAmount,
             currentBalance: user.balance,
-            transaction,
-            wallet: await buildWalletPayload(user._id)
+            balance: user.balance
         });
 
     } catch (error) {
@@ -76,9 +58,25 @@ exports.getWalletBalance = async (req, res) => {
             });
         }
 
-        const wallet = await buildWalletPayload(req.user._id);
+        const lastRecharge = await Transaction.findOne({
+            user: req.user._id,
+            type: 'credit'
+        }).sort({ createdAt: -1 });
 
-        res.json(wallet);
+        res.json({
+            balance: user.balance,
+            cardNumber: user.nfcUid || '',
+            lastRechargeDate: lastRecharge ? lastRecharge.createdAt : null,
+            user: {
+                _id: user._id,
+                name: user.name,
+                mobileNumber: user.mobileNumber,
+                email: user.email,
+                role: user.role,
+                balance: user.balance,
+                nfcUid: user.nfcUid
+            }
+        });
     } catch (error) {
         res.status(500).json({
             message: error.message
